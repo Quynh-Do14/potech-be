@@ -223,7 +223,6 @@ const updateProduct = async (
     name,
     description,
     short_description,
-    more_infomation,
     price,
     price_sale,
     category_id,
