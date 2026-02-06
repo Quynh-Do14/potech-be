@@ -112,13 +112,17 @@ const getAllAgency = async ({
   }
 }
 const getAgencyById = async id => {
+  // Lấy thông tin agency
   const result = await db.query('SELECT * FROM agency WHERE id = $1', [id])
+
+  // Lấy danh sách categories type của agency
   const agencyCategoriesType = await db.query(
     `SELECT id, category_id, agency_id FROM agency_categories_type WHERE agency_id = $1`,
     [id]
   )
 
-  result.agency_categories_type = agencyCategoriesType.rows
+  // Thêm field agency_categories_type vào kết quả
+  result.rows[0].agency_categories_type = agencyCategoriesType.rows
 
   return result.rows[0]
 }

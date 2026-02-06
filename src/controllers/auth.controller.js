@@ -17,7 +17,9 @@ const register = async (req, res) => {
       password: hashedPassword
     })
 
-    res.status(201).json({ user })
+    // Không trả về password trong response
+    const { password: _, ...userWithoutPassword } = user
+    res.status(201).json({ user: userWithoutPassword })
   } catch (error) {
     console.log(error)
     res.status(500).json({ message: 'Server error', error })
@@ -44,4 +46,87 @@ const login = async (req, res) => {
   }
 }
 
-module.exports = { register, login }
+const getProfile = async (req, res) => {
+  try {
+    // Lấy user ID từ middleware authentication (giả sử đã có middleware auth)
+    const userId = req.user.id
+
+    const user = await userModel.findUserById(userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    // Không trả về password trong response
+    const { password, ...userWithoutPassword } = user
+    res.json({
+      user: userWithoutPassword
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error })
+  }
+}
+
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { name, email } = req.body
+
+    // Kiểm tra nếu email mới đã tồn tại (trừ chính user hiện tại)
+    if (email) {
+      const existingUser = await userModel.findUserByEmail(email)
+      if (existingUser && existingUser.id !== userId) {
+        return res.status(400).json({ message: 'Email already exists' })
+      }
+    }
+
+    const updatedUser = await userModel.updateUser(userId, { name, email })
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    const { password, ...userWithoutPassword } = updatedUser
+    res.json({
+      message: 'Profile updated successfully',
+      user: userWithoutPassword
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error })
+  }
+}
+
+const changePassword = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { currentPassword, newPassword } = req.body
+
+    // Lấy thông tin user hiện tại
+    const user = await userModel.findUserById(userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    // Xác thực mật khẩu hiện tại
+    const isMatch = await bcrypt.compare(currentPassword, user.password)
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Current password is incorrect' })
+    }
+
+    // Hash mật khẩu mới
+    const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+    // Cập nhật mật khẩu
+    await userModel.updateUser(userId, { password: hashedPassword })
+
+    res.json({ message: 'Password changed successfully' })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error })
+  }
+}
+
+module.exports = {
+  register,
+  login,
+  getProfile,
+  updateProfile,
+  changePassword
+}

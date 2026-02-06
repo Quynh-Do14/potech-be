@@ -7,8 +7,13 @@ const storage = multer.diskStorage({
     cb(null, 'src/uploads/')
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname)
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`
+    const ext = path.extname(file.originalname) // Lấy đuôi file (.jpg, .png, ...)
+    const nameWithoutExt = path.basename(file.originalname, ext) // Lấy tên không có đuôi
+    const sanitizedName = nameWithoutExt.replace(
+      /[^a-zA-Z0-9_\u4e00-\u9fff\-\.]/g,
+      '-'
+    ) // Loại bỏ ký tự đặc biệt
+    const uniqueName = `${sanitizedName}-${Date.now()}${ext}` // Thêm timestamp để tránh trùng
     cb(null, uniqueName)
   }
 })
