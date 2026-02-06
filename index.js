@@ -3,6 +3,7 @@ const express = require('express')
 const cors = require('cors')
 require('dotenv').config()
 const fs = require('fs')
+const errorHandler = require('./src/middlewares/errorHandler.middleware')
 
 if (!fs.existsSync('./src/uploads')) {
   fs.mkdirSync('./src/uploads', { recursive: true })
@@ -45,7 +46,6 @@ app.use('/api/agency-category', agencyCategoryRoutes)
 app.use('/api/video', videoRoutes)
 app.use('/api/contact', contactRoutes)
 
-
 app.use('/api/uploads', express.static('src/uploads'))
 // Health check
 app.get('/', (req, res) => {
@@ -53,12 +53,9 @@ app.get('/', (req, res) => {
 })
 
 // Global error handler (tùy chọn, đơn giản)
-app.use((err, req, res, next) => {
-  console.error(err.stack)
-  res.status(500).json({ message: 'Something went wrong!' })
-})
-
+app.use(errorHandler)
 // Start server
+
 app.listen(PORT, () => {
   console.log(`✅ Server is running at http://localhost:${PORT}`)
 })
