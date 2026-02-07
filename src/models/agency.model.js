@@ -136,7 +136,7 @@ const createAgency = async ({
   province,
   district,
   star_rate,
-  agency_category_type = [],
+  agency_categories_type = [],
   image
 }) => {
   const result = await db.query(
@@ -153,12 +153,11 @@ const createAgency = async ({
       image
     ]
   )
-  console.log('agency_category_type2', agency_category_type)
 
   const agencyId = result.rows[0].id
 
   // 3. Insert thông số kỹ thuật
-  for (const type of agency_category_type) {
+  for (const type of agency_categories_type) {
     await db.query(
       `INSERT INTO agency_categories_type (agency_id, category_id) VALUES ($1, $2)`,
       [agencyId, type]
@@ -179,7 +178,7 @@ const updateAgency = async (
     province,
     district,
     star_rate,
-    agency_category_type = [],
+    agency_categories_type = [],
     image
   }
 ) => {
@@ -242,14 +241,12 @@ const updateAgency = async (
   values.push(id)
 
   const result = await db.query(query, values)
-  console.log('agency_category_type', agency_category_type)
-  console.log('id', id)
 
   // 3. Insert thông số kỹ thuật
   await db.query(`DELETE FROM agency_categories_type WHERE agency_id = $1`, [
     id
   ])
-  for (const type of agency_category_type) {
+  for (const type of agency_categories_type) {
     await db.query(
       `INSERT INTO agency_categories_type (agency_id, category_id) VALUES ($1, $2)`,
       [id, type]

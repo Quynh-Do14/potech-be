@@ -2,8 +2,8 @@ const bannerModel = require('../models/banner.model')
 
 const getAll = async (req, res) => {
   try {
-    const { page = 1, limit = 10, type = '' } = req.query
-    const result = await bannerModel.getAllBanner({ page, limit, type })
+    const { page = 1, limit = 10, search = '', type = '' } = req.query
+    const result = await bannerModel.getAllBanner({ page, limit, search, type })
     res.json(result)
   } catch (error) {
     res.status(500).json({ message: 'Server error', error })

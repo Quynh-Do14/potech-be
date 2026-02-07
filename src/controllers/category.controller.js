@@ -1,17 +1,13 @@
-const { ROLES, MESSAGES } = require('../constants')
-const blogModel = require('../models/blog.model')
+const { ROLES } = require('../constants')
+const categoryModel = require('../models/category.model')
+const AppError = require('../utils/AppError')
 const userModel = require('../models/user.model')
 
 const getAll = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', category_id } = req.query
+    const { page = 1, limit = 10, search = '' } = req.query
 
-    const result = await blogModel.getAllBLog({
-      page,
-      limit,
-      search,
-      category_id
-    })
+    const result = await categoryModel.getAllCategories({ page, limit, search })
     res.json(result)
   } catch (error) {
     res.status(500).json({ message: 'Server error', error })
@@ -19,80 +15,126 @@ const getAll = async (req, res) => {
 }
 
 const getById = async (req, res) => {
-  const item = await blogModel.getBLogById(req.params.id)
-  if (!item) return res.status(404).json({ message: 'Không tìm thấy tin tức' })
-  res.json(item)
+  const data = await categoryModel.getCategoryById(req.params.id)
+  if (!data) return res.status(404).json({ message: 'Not found' })
+  res.json(data)
 }
 
-const create = async (req, res) => {
+const create = async (req, res, next) => {
   try {
-    const profile = await userModel.findUserById(req.user.id)
-    const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
+    const { name, description } = req.body
 
-    if (!allowedRoles.includes(profile.role_name)) {
-      return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+    // Validate dữ liệu đầu vào
+    if (!name || name.trim() === '') {
+      throw new AppError('Tên danh mục là bắt buộc', 400)
     }
 
-    const { title, description, short_description, blog_category_id } = req.body
+    if (name.length > 255) {
+      throw new AppError('Tên danh mục không được vượt quá 255 ký tự', 400)
+    }
+
     const image = req.file ? `/uploads/${req.file.filename}` : null
 
-    const blog = await blogModel.createBLog({
-      title,
-      description,
-      short_description,
-      blog_category_id,
-      image,
-      user_id: req.user.id
-    })
-    res.status(201).json(blog)
-  } catch (err) {
-    res.status(500).json({ message: 'Lỗi tạo blog', error: err.message })
-  }
-}
-
-const update = async (req, res) => {
-  try {
-    const profile = await userModel.findUserById(req.user.id)
-    const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
-    console.log("req.user.id",req.user.id);
-    
-    if (!allowedRoles.includes(profile.role_name)) {
-      return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
-    }
-
-    const { title, description, short_description, blog_category_id } = req.body
-    const image = req.file
-      ? `/uploads/${req.file.filename}`
-      : req.body.image || null
-    const blog = await blogModel.updateBLog(req.params.id, {
-      title,
-      description,
-      short_description,
-      blog_category_id,
+    const newCategory = await categoryModel.createCategory({
+      name: name.trim(),
+      description: description ? description.trim() : null,
       image
     })
-    res.status(201).json(blog)
-  } catch (err) {
-    res
-      .status(500)
-      .json({ message: 'Lỗi cập nhật tin tức', error: err.message })
+
+    res.status(201).json({
+      success: true,
+      message: 'Tạo danh mục thành công',
+      data: newCategory
+    })
+  } catch (error) {
+    next(error)
   }
 }
 
-const remove = async (req, res) => {
+const update = async (req, res, next) => {
   try {
+    // Kiểm tra quyền truy cập
     const profile = await userModel.findUserById(req.user.id)
-    const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
+    const allowedRoles = [ROLES.ADMIN, ROLES.SELLER]
 
     if (!allowedRoles.includes(profile.role_name)) {
-      return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+      throw new AppError('Không có quyền thực hiện hành động này', 403)
     }
 
-    await blogModel.deleteBLog(req.params.id)
-    res.json({ message: 'Đã xoá tin tức' })
-  } catch (err) {
-    res.status(500).json({ message: 'Lỗi xóa tin tức', error: err.message })
+    const { id } = req.params
+    const { name, description, image } = req.body
+
+    // Validate input
+    if (!id || isNaN(parseInt(id))) {
+      throw new AppError('ID không hợp lệ', 400)
+    }
+
+    if (!name || name.trim() === '') {
+      throw new AppError('Tên danh mục blog là bắt buộc', 400)
+    }
+
+    if (name.length > 255) {
+      throw new AppError('Tên danh mục blog không được vượt quá 255 ký tự', 400)
+    }
+
+    const category = await categoryModel.updateCategory(
+      id,
+      name.trim(),
+      description,
+      image
+    )
+
+    if (!category) {
+      throw new AppError('Không tìm thấy danh mục blog', 404)
+    }
+
+    res.json({
+      success: true,
+      message: 'Cập nhật danh mục blog thành công',
+      data: category
+    })
+  } catch (error) {
+    next(error)
   }
 }
 
-module.exports = { getAll, getById, create, update, remove }
+const remove = async (req, res, next) => {
+  try {
+    const profile = await userModel.findUserById(req.user.id)
+    const allowedRoles = [ROLES.ADMIN, ROLES.SELLER]
+
+    if (!allowedRoles.includes(profile.role_name)) {
+      throw new AppError('Không có quyền thực hiện hành động này', 403)
+    }
+    const { id } = req.params
+
+    if (!id || isNaN(parseInt(id))) {
+      throw new AppError('ID không hợp lệ', 400)
+    }
+
+    // Kiểm tra xem danh mục có tồn tại không
+    const categoryExists = await categoryModel.getCategoryById(id)
+    if (!categoryExists) {
+      throw new AppError('Không tìm thấy danh mục', 404)
+    }
+
+    // Gọi hàm xóa - nếu có lỗi sẽ throw AppError trong model
+    const result = await categoryModel.deleteCategory(id)
+
+    res.json({
+      success: true,
+      message: result.message || 'Xóa danh mục thành công',
+      data: result.data || null
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+module.exports = {
+  getAll,
+  getById,
+  create,
+  update,
+  remove
+}

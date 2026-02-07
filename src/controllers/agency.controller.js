@@ -56,7 +56,7 @@ const create = async (req, res) => {
       province,
       district,
       star_rate,
-      agency_category_type
+      agency_categories_type
     } = req.body
     const image = req.file ? `/uploads/${req.file.filename}` : null
 
@@ -67,9 +67,9 @@ const create = async (req, res) => {
         .json({ message: 'Name, address and phone number are required' })
     }
 
-    const agencyCategoryType = JSON.parse(agency_category_type || '[]')
+    const agencyCategoryType = JSON.parse(agency_categories_type || '[]')
     console.log('agencyCategoryType', agencyCategoryType)
-    console.log('agency_category_type1', agency_category_type)
+    console.log('agency_categories_type1', agency_categories_type)
 
     const newAgency = await agencyModel.createAgency({
       name,
@@ -80,7 +80,7 @@ const create = async (req, res) => {
       province,
       district,
       star_rate,
-      agency_category_type: agencyCategoryType,
+      agency_categories_type: agencyCategoryType,
       image
     })
     res.status(201).json(newAgency)
@@ -105,14 +105,13 @@ const update = async (req, res) => {
       phone_number,
       province,
       district,
-      agency_category_type
+      agency_categories_type
     } = req.body
     const image = req.file
       ? `/uploads/${req.file.filename}`
       : req.body.image || undefined
 
-    const agencyCategoryType = JSON.parse(agency_category_type || '[]')
-    console.log('agencyCategoryType', agencyCategoryType)
+    const agencyCategoryType = JSON.parse(agency_categories_type || '[]')
 
     const updateData = {
       ...(name !== undefined && { name }),
@@ -123,7 +122,7 @@ const update = async (req, res) => {
       ...(province !== undefined && { province }),
       ...(district !== undefined && { district }),
       ...(agencyCategoryType !== undefined && {
-        agency_category_type: agencyCategoryType
+        agency_categories_type: agencyCategoryType
       }),
       ...(image !== undefined && { image })
     }
