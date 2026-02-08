@@ -1,59 +1,58 @@
 const db = require('../config/database')
 
-const getAllBanner = async ({ page = 1, limit = 10, type = '' }) => {
+const getAllBanner = async ({ page = 1, limit = 10, search = '' }) => {
   const offset = (page - 1) * limit
-  const conditions = []
   const values = []
+  const conditions = []
 
-  // Xây dựng điều kiện WHERE nếu có lọc theo type
-  if (type) {
-    values.push(type)
-    conditions.push(`type = $${values.length}`)
+  let whereClause = ''
+
+  if (search) {
+    values.push(`%${search}%`)
+    conditions.push(`LOWER(title) LIKE LOWER($${values.length})`)
   }
 
-  // Tạo câu WHERE nếu có điều kiện
-  const whereClause =
-    conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
-
-  // Câu truy vấn chính
-  const dataQuery = `
-    SELECT * FROM banner
-    AND active = true
-    ${whereClause}
-    ORDER BY id DESC
-    LIMIT $${values.length + 1}
-    OFFSET $${values.length + 2}
-  `
-
-  // Câu truy vấn đếm tổng số dòng
-  const countQuery = `
-    SELECT COUNT(*) FROM banner
-    AND active = true
-    ${whereClause}
-  `
+  if (conditions.length > 0) {
+    whereClause = ` AND ${conditions.join(' AND ')}`
+  }
 
   // Thêm limit và offset vào values
   values.push(limit)
   values.push(offset)
 
-  // Thực hiện truy vấn
-  const dataResult = await db.query(dataQuery, values)
+  const dataQuery = `
+    SELECT * FROM banner
+    WHERE active = true
+    ${whereClause}
+    ORDER BY id DESC
+    LIMIT $${values.length - 1}
+    OFFSET $${values.length}
+    `
+
+  const countQuery = `
+    SELECT COUNT(*) FROM banner
+    WHERE active = true
+    ${whereClause}
+  `
+
+  // Lấy tổng số (dùng slice để loại bỏ limit và offset)
   const countResult = await db.query(
     countQuery,
-    values.slice(0, conditions.length)
+    values.slice(0, values.length - 2)
   )
-
   const total = parseInt(countResult.rows[0].count)
+
+  // Lấy dữ liệu
+  const dataResult = await db.query(dataQuery, values)
 
   return {
     data: dataResult.rows,
     total,
-    page: parseInt(page),
-    limit: parseInt(limit),
+    page,
+    limit,
     totalPages: Math.ceil(total / limit)
   }
 }
-
 const getAllBannerPrivate = async ({
   page = 1,
   limit = 10,

@@ -11,15 +11,23 @@ const getAllProducts = async ({
 }) => {
   const offset = (page - 1) * limit
   const queryParams = []
+
+  // Data query với đầy đủ conditions
   let query = `
     SELECT p.*, c.name AS category_name, b.name AS brand_name
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.active = true
   `
-  let countQuery = `SELECT COUNT(*) FROM products p WHERE p.active = true`
-  const conditions = []
+
+  let countQuery = `
+    SELECT COUNT(*)
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+  `
+
+  const conditions = ['p.active = true'] // Thêm active vào đây
 
   if (search) {
     queryParams.push(`%${search}%`)
@@ -46,23 +54,28 @@ const getAllProducts = async ({
     conditions.push(`p.price <= $${queryParams.length}`)
   }
 
+  // FIXED: Đúng syntax WHERE clause
   if (conditions.length > 0) {
     const whereClause = ` WHERE ${conditions.join(' AND ')}`
     query += whereClause
     countQuery += whereClause
   }
 
-  queryParams.push(limit, offset)
-  query += ` ORDER BY p.id DESC LIMIT $${queryParams.length - 1} OFFSET $${
-    queryParams.length
-  }`
+  // Thêm ORDER BY và pagination
+  query += ` ORDER BY p.id DESC`
 
-  const result = await db.query(query, queryParams)
-  const count = await db.query(
-    countQuery,
-    queryParams.slice(0, queryParams.length - 2)
-  )
+  // Thêm limit và offset
+  queryParams.push(limit)
+  queryParams.push(offset)
+  query += ` LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`
 
+  // Execute queries
+  const [result, count] = await Promise.all([
+    db.query(query, queryParams),
+    db.query(countQuery, queryParams.slice(0, queryParams.length - 2))
+  ])
+
+  // Lấy images (vẫn N+1 nhưng fix logic trước)
   for (let product of result.rows) {
     const imgs = await db.query(
       `SELECT image_url FROM product_images WHERE product_id = $1`,
@@ -71,12 +84,14 @@ const getAllProducts = async ({
     product.images = imgs.rows.map(r => r.image_url)
   }
 
+  const total = parseInt(count.rows[0].count)
+
   return {
     data: result.rows,
-    total: parseInt(count.rows[0].count),
+    total,
     page: parseInt(page),
     limit: parseInt(limit),
-    totalPages: Math.ceil(count.rows[0].count / limit)
+    totalPages: Math.ceil(total / limit)
   }
 }
 
