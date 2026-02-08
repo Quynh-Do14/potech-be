@@ -1,9 +1,32 @@
 const bannerModel = require('../models/banner.model')
+const { ROLES, MESSAGES } = require('../constants')
+const userModel = require('../models/user.model')
 
 const getAll = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', type = '' } = req.query
-    const result = await bannerModel.getAllBanner({ page, limit, search, type })
+    const { page = 1, limit = 10, type = '' } = req.query
+    const result = await bannerModel.getAllBanner({ page, limit, type })
+    res.json(result)
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error })
+  }
+}
+
+const getAllPrivate = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
+
+  if (!allowedRoles.includes(profile.role_name)) {
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+  }
+  try {
+    const { page = 1, limit = 10, type = '', active } = req.query
+    const result = await bannerModel.getAllBannerPrivate({
+      page,
+      limit,
+      type,
+      active
+    })
     res.json(result)
   } catch (error) {
     res.status(500).json({ message: 'Server error', error })
@@ -16,14 +39,33 @@ const getById = async (req, res) => {
   res.json(data)
 }
 
+const getByIdPrivate = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
+
+  if (!allowedRoles.includes(profile.role_name)) {
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+  }
+  const data = await bannerModel.getBannerByIdPrivate(req.params.id)
+  if (!data) return res.status(404).json({ message: 'Not found' })
+  res.json(data)
+}
+
 const create = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
+
+  if (!allowedRoles.includes(profile.role_name)) {
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+  }
   try {
-    const { name, type } = req.body
+    const { name, type, active } = req.body
     const image = req.file ? `/uploads/${req.file.filename}` : null
 
     const newCategory = await bannerModel.createBanner({
       name,
       type,
+      active,
       image
     })
     res.status(201).json(newCategory)
@@ -33,8 +75,14 @@ const create = async (req, res) => {
 }
 
 const update = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
+
+  if (!allowedRoles.includes(profile.role_name)) {
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+  }
   try {
-    const { name, type } = req.body
+    const { name, type, active } = req.body
     const image = req.file
       ? `/uploads/${req.file.filename}`
       : req.body.image || null
@@ -42,6 +90,7 @@ const update = async (req, res) => {
     const updated = await bannerModel.updateBanner(req.params.id, {
       name,
       type,
+      active,
       image
     })
     if (!updated) return res.status(404).json({ message: 'Not found' })
@@ -52,8 +101,22 @@ const update = async (req, res) => {
 }
 
 const remove = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
+
+  if (!allowedRoles.includes(profile.role_name)) {
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+  }
   await bannerModel.deleteBanner(req.params.id)
   res.json({ message: 'Category deleted' })
 }
 
-module.exports = { getAll, getById, create, update, remove }
+module.exports = {
+  getAll,
+  getAllPrivate,
+  getById,
+  getByIdPrivate,
+  create,
+  update,
+  remove
+}

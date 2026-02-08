@@ -17,9 +17,7 @@ const getAllAgency = async ({
   // Xây dựng điều kiện WHERE
   if (search) {
     values.push(`%${search}%`)
-    conditions.push(
-      `(a.name ILIKE $${paramIndex} OR a.address ILIKE $${paramIndex} OR a.phone_number ILIKE $${paramIndex})`
-    )
+    conditions.push(`(a.name ILIKE $${paramIndex})`)
     paramIndex++
   }
 
@@ -39,6 +37,126 @@ const getAllAgency = async ({
     // Nếu star_rate là số, không dùng ILIKE
     values.push(parseFloat(star_rate))
     conditions.push(`a.star_rate = $${paramIndex}`)
+    paramIndex++
+  }
+
+  // JOIN cho điều kiện category_id
+  let joinClause = ''
+  if (category_id) {
+    values.push(parseInt(category_id))
+    conditions.push(`act.category_id = $${paramIndex}`)
+    paramIndex++
+    joinClause = 'INNER JOIN agency_categories_type act ON a.id = act.agency_id'
+  }
+
+  // Tạo câu WHERE
+  const whereClause =
+    conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
+
+  // Câu truy vấn chính - DISTINCT để tránh trùng lặp khi JOIN
+  const dataQuery = `
+    SELECT DISTINCT a.* 
+    FROM agency a
+    ${joinClause}
+    ${whereClause}
+    WHERE a.active = true
+    ORDER BY a.id DESC
+    LIMIT $${paramIndex}
+    OFFSET $${paramIndex + 1}
+  `
+
+  // Câu truy vấn đếm tổng số dòng
+  const countQuery = `
+    SELECT COUNT(DISTINCT a.id) 
+    FROM agency a
+    WHERE a.active = true
+    ${joinClause}
+    ${whereClause}
+  `
+
+  // Thêm limit và offset vào values
+  values.push(limit, offset)
+
+  // Thực hiện truy vấn chính
+  const dataResult = await db.query(dataQuery, values)
+
+  // Lấy categories cho từng agency (sử dụng Promise.all để chạy song song)
+  const agenciesWithCategories = await Promise.all(
+    dataResult.rows.map(async item => {
+      const agencyCategoriesResult = await db.query(
+        `SELECT act.*, ac.name as category_name 
+         FROM agency_categories_type act 
+         LEFT JOIN agency_categories ac ON act.category_id = ac.id 
+         WHERE act.agency_id = $1`,
+        [item.id]
+      )
+
+      return {
+        ...item,
+        categories: agencyCategoriesResult.rows
+      }
+    })
+  )
+
+  // Thực hiện truy vấn đếm (loại bỏ limit và offset)
+  const countParams = values.slice(0, values.length - 2)
+  const countResult = await db.query(countQuery, countParams)
+  const total = parseInt(countResult.rows[0].count)
+
+  return {
+    data: agenciesWithCategories,
+    total,
+    page: parseInt(page),
+    limit: parseInt(limit),
+    totalPages: Math.ceil(total / limit)
+  }
+}
+
+const getAllAgencyPrivate = async ({
+  page = 1,
+  limit = 10,
+  search = '',
+  province,
+  district,
+  star_rate,
+  category_id,
+  active
+}) => {
+  const offset = (page - 1) * limit
+  const conditions = []
+  const values = []
+  let paramIndex = 1
+
+  // Xây dựng điều kiện WHERE
+  if (search) {
+    values.push(`%${search}%`)
+    conditions.push(`(a.name ILIKE $${paramIndex})`)
+    paramIndex++
+  }
+
+  if (province) {
+    values.push(`%${province}%`)
+    conditions.push(`a.province ILIKE $${paramIndex}`)
+    paramIndex++
+  }
+
+  if (district) {
+    values.push(`%${district}%`)
+    conditions.push(`a.district ILIKE $${paramIndex}`)
+    paramIndex++
+  }
+
+  if (star_rate) {
+    // Nếu star_rate là số, không dùng ILIKE
+    values.push(parseFloat(star_rate))
+    conditions.push(`a.star_rate = $${paramIndex}`)
+    paramIndex++
+  }
+  if (active !== undefined && active !== '') {
+    // Xử lý active là boolean
+    const activeBool = active === 'true' || active === true
+    values.push(activeBool)
+    conditions.push(`a.active = $${paramIndex}`)
     paramIndex++
   }
 
@@ -111,7 +229,27 @@ const getAllAgency = async ({
     totalPages: Math.ceil(total / limit)
   }
 }
+
 const getAgencyById = async id => {
+  // Lấy thông tin agency
+  const result = await db.query(
+    'SELECT * FROM agency WHERE id = $1 AND active = true',
+    [id]
+  )
+
+  // Lấy danh sách categories type của agency
+  const agencyCategoriesType = await db.query(
+    `SELECT id, category_id, agency_id FROM agency_categories_type WHERE agency_id = $1`,
+    [id]
+  )
+
+  // Thêm field agency_categories_type vào kết quả
+  result.rows[0].agency_categories_type = agencyCategoriesType.rows
+
+  return result.rows[0]
+}
+
+const getAgencyByIdPrivate = async id => {
   // Lấy thông tin agency
   const result = await db.query('SELECT * FROM agency WHERE id = $1', [id])
 
@@ -137,10 +275,11 @@ const createAgency = async ({
   district,
   star_rate,
   agency_categories_type = [],
+  active,
   image
 }) => {
   const result = await db.query(
-    'INSERT INTO agency(name, address, lat, long, phone_number,province, district, star_rate, image) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+    'INSERT INTO agency(name, address, lat, long, phone_number,province, district, star_rate, active, image) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
     [
       name,
       address,
@@ -150,6 +289,7 @@ const createAgency = async ({
       province,
       district,
       star_rate,
+      active,
       image
     ]
   )
@@ -179,6 +319,7 @@ const updateAgency = async (
     district,
     star_rate,
     agency_categories_type = [],
+    active,
     image
   }
 ) => {
@@ -227,6 +368,11 @@ const updateAgency = async (
     values.push(star_rate)
   }
 
+  if (active !== undefined) {
+    fields.push('active')
+    values.push(active)
+  }
+
   if (image !== undefined) {
     fields.push('image')
     values.push(image)
@@ -262,7 +408,9 @@ const deleteAgency = async id => {
 
 module.exports = {
   getAllAgency,
+  getAllAgencyPrivate,
   getAgencyById,
+  getAgencyByIdPrivate,
   createAgency,
   updateAgency,
   deleteAgency

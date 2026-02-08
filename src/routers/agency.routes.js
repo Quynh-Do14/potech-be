@@ -6,6 +6,8 @@ const { authenticate } = require('../middlewares/auth.middleware')
 
 // CRUD operations
 router.get('/', agencyController.getAll)
+router.get('/private', authenticate, agencyController.getAllPrivate)
+router.get('/private/:id', authenticate, agencyController.getByIdPrivate)
 router.get('/:id', agencyController.getById)
 router.post('/', authenticate, upload.single('image'), agencyController.create)
 router.put(

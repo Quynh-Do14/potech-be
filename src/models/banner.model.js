@@ -1,28 +1,77 @@
 const db = require('../config/database')
 
-const getAllBanner = async ({
-  page = 1,
-  limit = 10,
-  search = '',
-  type = ''
-}) => {
+const getAllBanner = async ({ page = 1, limit = 10, type = '' }) => {
   const offset = (page - 1) * limit
   const conditions = []
   const values = []
-  let paramIndex = 1
-
-  // Xây dựng điều kiện WHERE nếu có tìm kiếm theo tên
-  if (search) {
-    values.push(`%${search}%`)
-    conditions.push(`name ILIKE $${paramIndex}`)
-    paramIndex++
-  }
 
   // Xây dựng điều kiện WHERE nếu có lọc theo type
   if (type) {
     values.push(type)
-    conditions.push(`type = $${paramIndex}`)
-    paramIndex++
+    conditions.push(`type = $${values.length}`)
+  }
+
+  // Tạo câu WHERE nếu có điều kiện
+  const whereClause =
+    conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
+
+  // Câu truy vấn chính
+  const dataQuery = `
+    SELECT * FROM banner
+    AND active = true
+    ${whereClause}
+    ORDER BY id DESC
+    LIMIT $${values.length + 1}
+    OFFSET $${values.length + 2}
+  `
+
+  // Câu truy vấn đếm tổng số dòng
+  const countQuery = `
+    SELECT COUNT(*) FROM banner
+    AND active = true
+    ${whereClause}
+  `
+
+  // Thêm limit và offset vào values
+  values.push(limit)
+  values.push(offset)
+
+  // Thực hiện truy vấn
+  const dataResult = await db.query(dataQuery, values)
+  const countResult = await db.query(
+    countQuery,
+    values.slice(0, conditions.length)
+  )
+
+  const total = parseInt(countResult.rows[0].count)
+
+  return {
+    data: dataResult.rows,
+    total,
+    page: parseInt(page),
+    limit: parseInt(limit),
+    totalPages: Math.ceil(total / limit)
+  }
+}
+
+const getAllBannerPrivate = async ({
+  page = 1,
+  limit = 10,
+  type = '',
+  active
+}) => {
+  const offset = (page - 1) * limit
+  const conditions = []
+  const values = []
+
+  // Xây dựng điều kiện WHERE nếu có lọc theo type
+  if (type) {
+    values.push(type)
+    conditions.push(`type = $${values.length}`)
+  }
+  if (active) {
+    values.push(active)
+    conditions.push(`active = $${values.length}`)
   }
 
   // Tạo câu WHERE nếu có điều kiện
@@ -34,8 +83,8 @@ const getAllBanner = async ({
     SELECT * FROM banner
     ${whereClause}
     ORDER BY id DESC
-    LIMIT $${paramIndex}
-    OFFSET $${paramIndex + 1}
+    LIMIT $${values.length + 1}
+    OFFSET $${values.length + 2}
   `
 
   // Câu truy vấn đếm tổng số dòng
@@ -50,10 +99,10 @@ const getAllBanner = async ({
 
   // Thực hiện truy vấn
   const dataResult = await db.query(dataQuery, values)
-
-  // Lấy tổng số bản ghi (chỉ dùng các tham số tìm kiếm, không dùng limit/offset)
-  const countValues = values.slice(0, values.length - 2) // Bỏ limit và offset
-  const countResult = await db.query(countQuery, countValues)
+  const countResult = await db.query(
+    countQuery,
+    values.slice(0, conditions.length)
+  )
 
   const total = parseInt(countResult.rows[0].count)
 
@@ -67,13 +116,21 @@ const getAllBanner = async ({
 }
 
 const getBannerById = async id => {
+  const result = await db.query(
+    'SELECT * FROM banner WHERE id = $1 AND active = true',
+    [id]
+  )
+  return result.rows[0]
+}
+
+const getBannerByIdPrivate = async id => {
   const result = await db.query('SELECT * FROM banner WHERE id = $1', [id])
   return result.rows[0]
 }
 
-const createBanner = async ({ name, image, type }) => {
+const createBanner = async ({ name, image, type, active }) => {
   // Danh sách type hợp lệ
-  const validTypes = ['HOMEPAGE', 'INTRODUCE', 'AGENCY', 'CONTACT']
+  const validTypes = ['HOMEPAGE', 'INTRODUCE', 'AGENCY', 'CONTACT', 'POLICY']
 
   // Validate type
   if (!type || type.trim() === '') {
@@ -102,7 +159,8 @@ const createBanner = async ({ name, image, type }) => {
         HOMEPAGE: 'Trang chủ',
         INTRODUCE: 'Giới thiệu',
         AGENCY: 'Đại lý',
-        CONTACT: 'Liên hệ'
+        CONTACT: 'Liên hệ',
+        POLICY: 'Chính sách'
       }
       const typeLabel = typeLabels[type] || type
       throw new Error(
@@ -121,15 +179,15 @@ const createBanner = async ({ name, image, type }) => {
   }
 
   const result = await db.query(
-    'INSERT INTO banner(name, image, type) VALUES($1, $2, $3) RETURNING *',
-    [name, image, type]
+    'INSERT INTO banner(name, image, type, active) VALUES($1, $2, $3, $4) RETURNING *',
+    [name, image, type, active]
   )
   return result.rows[0]
 }
 
-const updateBanner = async (id, { name, image, type }) => {
+const updateBanner = async (id, { name, image, type, active }) => {
   // Danh sách type hợp lệ
-  const validTypes = ['HOMEPAGE', 'INTRODUCE', 'AGENCY', 'CONTACT']
+  const validTypes = ['HOMEPAGE', 'INTRODUCE', 'AGENCY', 'CONTACT', 'POLICY']
 
   // Kiểm tra ID hợp lệ
   if (!id) {
@@ -178,7 +236,8 @@ const updateBanner = async (id, { name, image, type }) => {
           HOMEPAGE: 'Trang chủ',
           INTRODUCE: 'Giới thiệu',
           AGENCY: 'Đại lý',
-          CONTACT: 'Liên hệ'
+          CONTACT: 'Liên hệ',
+          POLICY: 'Chính sách'
         }
         const typeLabel = typeLabels[type] || type
         throw new Error(
@@ -205,7 +264,8 @@ const updateBanner = async (id, { name, image, type }) => {
           HOMEPAGE: 'Trang chủ',
           INTRODUCE: 'Giới thiệu',
           AGENCY: 'Đại lý',
-          CONTACT: 'Liên hệ'
+          CONTACT: 'Liên hệ',
+          POLICY: 'Chính sách'
         }
         const typeLabel = typeLabels[type] || type
         throw new Error(
@@ -231,6 +291,11 @@ const updateBanner = async (id, { name, image, type }) => {
   if (type !== undefined) {
     fields.push('type')
     values.push(type.trim())
+  }
+
+  if (active !== undefined) {
+    fields.push('active')
+    values.push(active.trim())
   }
 
   // CHỈ cập nhật ảnh nếu image không phải là undefined VÀ không phải là null/chuỗi rỗng
@@ -274,7 +339,9 @@ const deleteBanner = async id => {
 
 module.exports = {
   getAllBanner,
+  getAllBannerPrivate,
   getBannerById,
+  getBannerByIdPrivate,
   createBanner,
   updateBanner,
   deleteBanner

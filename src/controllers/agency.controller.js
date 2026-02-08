@@ -28,9 +28,59 @@ const getAll = async (req, res) => {
   }
 }
 
+const getAllPrivate = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.SELLER]
+
+  if (!allowedRoles.includes(profile.role_name)) {
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+  }
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      province = '',
+      district = '',
+      star_rate = '',
+      category_id = '',
+      active
+    } = req.query
+    const result = await agencyModel.getAllAgencyPrivate({
+      page,
+      limit,
+      search,
+      province,
+      district,
+      star_rate,
+      category_id,
+      active
+    })
+    res.json(result)
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
 const getById = async (req, res) => {
   try {
     const data = await agencyModel.getAgencyById(req.params.id)
+    if (!data) return res.status(404).json({ message: 'Agency not found' })
+    res.json(data)
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
+const getByIdPrivate = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.SELLER]
+
+  if (!allowedRoles.includes(profile.role_name)) {
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+  }
+  try {
+    const data = await agencyModel.getAgencyByIdPrivate(req.params.id)
     if (!data) return res.status(404).json({ message: 'Agency not found' })
     res.json(data)
   } catch (error) {
@@ -56,6 +106,7 @@ const create = async (req, res) => {
       province,
       district,
       star_rate,
+      active,
       agency_categories_type
     } = req.body
     const image = req.file ? `/uploads/${req.file.filename}` : null
@@ -68,8 +119,6 @@ const create = async (req, res) => {
     }
 
     const agencyCategoryType = JSON.parse(agency_categories_type || '[]')
-    console.log('agencyCategoryType', agencyCategoryType)
-    console.log('agency_categories_type1', agency_categories_type)
 
     const newAgency = await agencyModel.createAgency({
       name,
@@ -80,6 +129,7 @@ const create = async (req, res) => {
       province,
       district,
       star_rate,
+      active,
       agency_categories_type: agencyCategoryType,
       image
     })
@@ -105,7 +155,8 @@ const update = async (req, res) => {
       phone_number,
       province,
       district,
-      agency_categories_type
+      agency_categories_type,
+      active
     } = req.body
     const image = req.file
       ? `/uploads/${req.file.filename}`
@@ -121,6 +172,7 @@ const update = async (req, res) => {
       ...(phone_number !== undefined && { phone_number }),
       ...(province !== undefined && { province }),
       ...(district !== undefined && { district }),
+      ...{ active },
       ...(agencyCategoryType !== undefined && {
         agency_categories_type: agencyCategoryType
       }),
@@ -155,7 +207,9 @@ const remove = async (req, res) => {
 
 module.exports = {
   getAll,
+  getAllPrivate,
   getById,
+  getByIdPrivate,
   create,
   update,
   remove

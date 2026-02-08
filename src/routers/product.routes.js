@@ -10,8 +10,9 @@ const uploadMultiple = upload.fields([
 ])
 
 router.get('/', productController.getAll)
+router.get('/private', authenticate, productController.getAllPrivate)
+router.get('/private/:id', authenticate, productController.getByIdPrivate)
 router.get('/:id', productController.getById)
-
 router.post('/', uploadMultiple, authenticate, productController.create)
 router.put('/:id', uploadMultiple, authenticate, productController.update)
 router.delete('/:id', authenticate, productController.remove)

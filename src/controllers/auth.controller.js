@@ -29,20 +29,76 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body
+
+    // Kiểm tra đầu vào
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email và mật khẩu là bắt buộc' })
+    }
+
+    // Tìm user theo email
     const user = await userModel.findUserByEmail(email)
-    if (!user) return res.status(401).json({ message: 'Invalid credentials' })
 
+    // Kiểm tra tài khoản tồn tại
+    if (!user) {
+      return res.status(401).json({
+        message: 'Tài khoản không tồn tại',
+        errorCode: 'USER_NOT_FOUND'
+      })
+    }
+
+    // Kiểm tra tài khoản bị khóa (disable)
+    if (user.active === false || user.active === 1) {
+      return res.status(403).json({
+        message: 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên',
+        errorCode: 'ACCOUNT_DISABLED'
+      })
+    }
+
+    // Kiểm tra mật khẩu
     const isMatch = await bcrypt.compare(password, user.password)
-    if (!isMatch)
-      return res.status(401).json({ message: 'Invalid credentials' })
+    if (!isMatch) {
+      // Có thể ghi log số lần thử đăng nhập thất bại ở đây
+      return res.status(401).json({
+        message: 'Mật khẩu không chính xác',
+        errorCode: 'INVALID_PASSWORD'
+      })
+    }
 
+    // Tạo token
     const accessToken = signToken({ id: user.id })
+
+    // Cập nhật thời gian đăng nhập cuối (nếu có field này)
+    if (userModel.updateLastLogin) {
+      await userModel.updateLastLogin(user.id)
+    }
+
     res.json({
       accessToken: accessToken,
       refreshToken: ''
     })
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error })
+    console.error('Login error:', error)
+
+    // Phân loại lỗi chi tiết hơn
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        message: 'Dữ liệu không hợp lệ',
+        error: error.message
+      })
+    }
+
+    if (error.name === 'DatabaseError') {
+      return res.status(503).json({
+        message: 'Lỗi kết nối cơ sở dữ liệu',
+        errorCode: 'DATABASE_ERROR'
+      })
+    }
+
+    res.status(500).json({
+      message: 'Lỗi máy chủ nội bộ',
+      errorCode: 'INTERNAL_SERVER_ERROR',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
   }
 }
 

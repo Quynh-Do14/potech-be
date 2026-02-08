@@ -4,8 +4,16 @@ const userModel = require('../models/user.model')
 
 const getAll = async (req, res) => {
   try {
-    const { page, limit, search, category_id, brand_id, min_price, max_price } =
-      req.query
+    const {
+      page,
+      limit,
+      search,
+      category_id,
+      brand_id,
+      min_price,
+      max_price,
+      active
+    } = req.query
     const result = await productModel.getAllProducts({
       page,
       limit,
@@ -13,7 +21,42 @@ const getAll = async (req, res) => {
       category_id,
       brand_id,
       min_price,
-      max_price
+      max_price,
+      active
+    })
+    res.json(result)
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server', error: err.message })
+  }
+}
+
+const getAllPrivate = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.SELLER]
+
+  if (!allowedRoles.includes(profile.role_name))
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+
+  try {
+    const {
+      page,
+      limit,
+      search,
+      category_id,
+      brand_id,
+      min_price,
+      max_price,
+      active
+    } = req.query
+    const result = await productModel.getAllProductsPrivate({
+      page,
+      limit,
+      search,
+      category_id,
+      brand_id,
+      min_price,
+      max_price,
+      active
     })
     res.json(result)
   } catch (err) {
@@ -23,6 +66,20 @@ const getAll = async (req, res) => {
 
 const getById = async (req, res) => {
   const product = await productModel.getProductById(req.params.id)
+  if (!product)
+    return res.status(404).json({ message: 'Không tìm thấy sản phẩm' })
+  res.json(product)
+}
+
+const getByIdPrivate = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.SELLER]
+
+  if (!allowedRoles.includes(profile.role_name)) {
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+  }
+
+  const product = await productModel.getProductByIdPrivate(req.params.id)
   if (!product)
     return res.status(404).json({ message: 'Không tìm thấy sản phẩm' })
   res.json(product)
@@ -119,4 +176,12 @@ const remove = async (req, res) => {
   }
 }
 
-module.exports = { getAll, getById, create, update, remove }
+module.exports = {
+  getAll,
+  getAllPrivate,
+  getById,
+  getByIdPrivate,
+  create,
+  update,
+  remove
+}

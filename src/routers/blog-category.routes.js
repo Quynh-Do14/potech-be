@@ -1,12 +1,21 @@
 const express = require('express')
 const router = express.Router()
-const blogCategoryController = require('../controllers/blog-category.controller')
+const bannerController = require('../controllers/banner.controller')
+const upload = require('../middlewares/upload.middleware')
 const { authenticate } = require('../middlewares/auth.middleware')
 
-router.get('/', blogCategoryController.getAll)
-router.get('/:id', blogCategoryController.getById)
-router.post('/', authenticate, blogCategoryController.create)
-router.put('/:id', authenticate, blogCategoryController.update)
-router.delete('/:id', authenticate, blogCategoryController.remove)
+// CRUD danh mục sản phẩm
+router.get('/', bannerController.getAll)
+router.get('/private', authenticate, bannerController.getAllPrivate)
+router.get('/private/:id', authenticate, bannerController.getByIdPrivate)
+router.get('/:id', bannerController.getById)
+router.post('/', upload.single('image'), authenticate, bannerController.create)
+router.put(
+  '/:id',
+  upload.single('image'),
+  authenticate,
+  bannerController.update
+)
+router.delete('/:id', authenticate, bannerController.remove)
 
 module.exports = router

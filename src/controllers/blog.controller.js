@@ -18,8 +18,44 @@ const getAll = async (req, res) => {
   }
 }
 
+const getAllPrivate = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
+
+  if (!allowedRoles.includes(profile.role_name)) {
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+  }
+  try {
+    const { page = 1, limit = 10, search = '', category_id, active } = req.query
+
+    const result = await blogModel.getAllBLogPrivate({
+      page,
+      limit,
+      search,
+      category_id,
+      active
+    })
+    res.json(result)
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error })
+  }
+}
+
 const getById = async (req, res) => {
   const item = await blogModel.getBLogById(req.params.id)
+  if (!item) return res.status(404).json({ message: 'Không tìm thấy tin tức' })
+  res.json(item)
+}
+
+const getByIdPrivate = async (req, res) => {
+  const profile = await userModel.findUserById(req.user.id)
+  const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
+
+  if (!allowedRoles.includes(profile.role_name)) {
+    return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
+  }
+
+  const item = await blogModel.getBLogByIdPrivate(req.params.id)
   if (!item) return res.status(404).json({ message: 'Không tìm thấy tin tức' })
   res.json(item)
 }
@@ -33,7 +69,8 @@ const create = async (req, res) => {
       return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
     }
 
-    const { title, description, short_description, blog_category_id } = req.body
+    const { title, description, short_description, blog_category_id, active } =
+      req.body
     const image = req.file ? `/uploads/${req.file.filename}` : null
 
     const blog = await blogModel.createBLog({
@@ -41,6 +78,7 @@ const create = async (req, res) => {
       description,
       short_description,
       blog_category_id,
+      active,
       image,
       user_id: req.user.id
     })
@@ -54,13 +92,14 @@ const update = async (req, res) => {
   try {
     const profile = await userModel.findUserById(req.user.id)
     const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
-    console.log("req.user.id",req.user.id);
-    
+    console.log('req.user.id', req.user.id)
+
     if (!allowedRoles.includes(profile.role_name)) {
       return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
     }
 
-    const { title, description, short_description, blog_category_id } = req.body
+    const { title, description, short_description, blog_category_id, active } =
+      req.body
     const image = req.file
       ? `/uploads/${req.file.filename}`
       : req.body.image || null
@@ -69,6 +108,7 @@ const update = async (req, res) => {
       description,
       short_description,
       blog_category_id,
+      active,
       image
     })
     res.status(201).json(blog)
@@ -95,4 +135,12 @@ const remove = async (req, res) => {
   }
 }
 
-module.exports = { getAll, getById, create, update, remove }
+module.exports = {
+  getAll,
+  getAllPrivate,
+  getById,
+  getByIdPrivate,
+  create,
+  update,
+  remove
+}
