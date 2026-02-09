@@ -14,7 +14,7 @@ const getAllBanner = async ({
 
   if (search) {
     values.push(`%${search}%`)
-    conditions.push(`LOWER(title) LIKE LOWER($${values.length})`)
+    conditions.push(`LOWER(name) LIKE LOWER($${values.length})`)
   }
 
   if (type) {
