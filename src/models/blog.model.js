@@ -244,7 +244,7 @@ const updateBLog = async (
     fields.push('image')
     values.push(image)
     query =
-      'UPDATE blog SET title = $1, description = $2, short_description =$3, blog_category_id = $4, active = $5 image = $6'
+      'UPDATE blog SET title = $1, description = $2, short_description =$3, blog_category_id = $4, active = $5, image = $6'
   }
 
   query += ` WHERE id = $${fields.length + 1} RETURNING *`

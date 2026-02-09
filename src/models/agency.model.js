@@ -51,7 +51,9 @@ const getAllAgency = async ({
 
   // Tạo câu WHERE
   const whereClause =
-    conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
+    conditions.length > 0
+      ? ` WHERE ${conditions.join(' AND ')} AND a.active = true`
+      : ''
 
   // Câu truy vấn chính - DISTINCT để tránh trùng lặp khi JOIN
   const dataQuery = `
@@ -59,8 +61,7 @@ const getAllAgency = async ({
     FROM agency a
     ${joinClause}
     ${whereClause}
-    WHERE a.active = true
-    ORDER BY a.id DESC
+    ORDER BY a.star_rate DESC
     LIMIT $${paramIndex}
     OFFSET $${paramIndex + 1}
   `
@@ -69,7 +70,6 @@ const getAllAgency = async ({
   const countQuery = `
     SELECT COUNT(DISTINCT a.id) 
     FROM agency a
-    WHERE a.active = true
     ${joinClause}
     ${whereClause}
   `
@@ -86,7 +86,7 @@ const getAllAgency = async ({
       const agencyCategoriesResult = await db.query(
         `SELECT act.*, ac.name as category_name 
          FROM agency_categories_type act 
-         LEFT JOIN agency_categories ac ON act.category_id = ac.id 
+         LEFT JOIN categories ac ON act.category_id = ac.id 
          WHERE act.agency_id = $1`,
         [item.id]
       )
@@ -204,7 +204,7 @@ const getAllAgencyPrivate = async ({
       const agencyCategoriesResult = await db.query(
         `SELECT act.*, ac.name as category_name 
          FROM agency_categories_type act 
-         LEFT JOIN agency_categories ac ON act.category_id = ac.id 
+         LEFT JOIN categories ac ON act.category_id = ac.id 
          WHERE act.agency_id = $1`,
         [item.id]
       )

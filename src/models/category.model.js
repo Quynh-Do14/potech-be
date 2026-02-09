@@ -121,9 +121,25 @@ const deleteCategory = async id => {
     const checkResult = await db.query(checkQuery, [id])
     const productCount = parseInt(checkResult.rows[0].product_count)
 
+    const checkQueryAgency = `
+      SELECT COUNT(*) as product_count 
+      FROM agency a
+      INNER JOIN agency_categories_type act ON a.id = act.agency_id
+      WHERE category_id = $1
+    `
+    const checkResultAgency = await db.query(checkQueryAgency, [id])
+    const productCountAgency = parseInt(checkResultAgency.rows[0].product_count)
+
     if (productCount > 0) {
       throw new AppError(
         `Không thể xóa danh mục. Có ${productCount} sản phẩm đang thuộc danh mục này.`,
+        400
+      )
+    }
+
+    if (productCountAgency > 0) {
+      throw new AppError(
+        `Không thể xóa danh mục. Có ${productCountAgency} đại lý có dòng sản phẩm của danh mục này.`,
         400
       )
     }

@@ -155,6 +155,7 @@ const update = async (req, res) => {
       phone_number,
       province,
       district,
+      star_rate,
       agency_categories_type,
       active
     } = req.body
@@ -172,6 +173,7 @@ const update = async (req, res) => {
       ...(phone_number !== undefined && { phone_number }),
       ...(province !== undefined && { province }),
       ...(district !== undefined && { district }),
+      ...(star_rate !== undefined && { star_rate }),
       ...{ active },
       ...(agencyCategoryType !== undefined && {
         agency_categories_type: agencyCategoryType
