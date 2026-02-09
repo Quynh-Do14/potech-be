@@ -4,8 +4,8 @@ const userModel = require('../models/user.model')
 
 const getAll = async (req, res) => {
   try {
-    const { page = 1, limit = 10, type = '' } = req.query
-    const result = await bannerModel.getAllBanner({ page, limit, type })
+    const { page = 1, limit = 10, search = '', type = '' } = req.query
+    const result = await bannerModel.getAllBanner({ page, limit, search, type })
     res.json(result)
   } catch (error) {
     res.status(500).json({ message: 'Server error', error })
@@ -20,10 +20,11 @@ const getAllPrivate = async (req, res) => {
     return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
   }
   try {
-    const { page = 1, limit = 10, type = '', active } = req.query
+    const { page = 1, limit = 10, search = '', type = '', active } = req.query
     const result = await bannerModel.getAllBannerPrivate({
       page,
       limit,
+      search,
       type,
       active
     })

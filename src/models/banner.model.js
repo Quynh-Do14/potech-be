@@ -1,6 +1,11 @@
 const db = require('../config/database')
 
-const getAllBanner = async ({ page = 1, limit = 10, search = '' }) => {
+const getAllBanner = async ({
+  page = 1,
+  limit = 10,
+  search = '',
+  type = ''
+}) => {
   const offset = (page - 1) * limit
   const values = []
   const conditions = []
@@ -10,6 +15,11 @@ const getAllBanner = async ({ page = 1, limit = 10, search = '' }) => {
   if (search) {
     values.push(`%${search}%`)
     conditions.push(`LOWER(title) LIKE LOWER($${values.length})`)
+  }
+
+  if (type) {
+    values.push(`%${type}%`)
+    conditions.push(`LOWER(type) LIKE LOWER($${values.length})`)
   }
 
   if (conditions.length > 0) {
@@ -53,15 +63,22 @@ const getAllBanner = async ({ page = 1, limit = 10, search = '' }) => {
     totalPages: Math.ceil(total / limit)
   }
 }
+
 const getAllBannerPrivate = async ({
   page = 1,
   limit = 10,
+  search = '',
   type = '',
   active
 }) => {
   const offset = (page - 1) * limit
   const conditions = []
   const values = []
+
+  if (search) {
+    values.push(`%${search}%`)
+    conditions.push(`LOWER(title) LIKE LOWER($${values.length})`)
+  }
 
   // Xây dựng điều kiện WHERE nếu có lọc theo type
   if (type) {
