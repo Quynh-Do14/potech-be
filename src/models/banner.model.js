@@ -77,7 +77,7 @@ const getAllBannerPrivate = async ({
 
   if (search) {
     values.push(`%${search}%`)
-    conditions.push(`LOWER(title) LIKE LOWER($${values.length})`)
+    conditions.push(`LOWER(name) LIKE LOWER($${values.length})`)
   }
 
   // Xây dựng điều kiện WHERE nếu có lọc theo type
