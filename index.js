@@ -23,6 +23,8 @@ const categoryRoutes = require('./src/routers/category.routes')
 const agencyCategoryRoutes = require('./src/routers/agency-category.routes')
 const videoRoutes = require('./src/routers/video.routes')
 const contactRoutes = require('./src/routers/contact.routes')
+const characteristicRoutes = require('./src/routers/characteristic.routes')
+
 const app = express()
 const PORT = process.env.PORT || 3000
 
@@ -45,6 +47,7 @@ app.use('/api/category', categoryRoutes)
 app.use('/api/agency-category', agencyCategoryRoutes)
 app.use('/api/video', videoRoutes)
 app.use('/api/contact', contactRoutes)
+app.use('/api/characteristic', characteristicRoutes)
 
 app.use('/api/uploads', express.static('src/uploads'))
 // Health check

@@ -1,12 +1,12 @@
 const db = require('../config/database')
 const AppError = require('../utils/AppError')
 
-const getAllCategories = async ({ page = 1, limit = 10, search = '' }) => {
+const getAllCharacteristic = async ({ page = 1, limit = 10, search = '' }) => {
   try {
     const offset = (page - 1) * limit
     const queryParams = []
-    let query = 'SELECT * FROM blog_categories'
-    let countQuery = 'SELECT COUNT(*) FROM blog_categories'
+    let query = 'SELECT * FROM characteristic'
+    let countQuery = 'SELECT COUNT(*) FROM characteristic'
     let conditions = []
 
     // Tìm kiếm theo tên (search)
@@ -45,66 +45,47 @@ const getAllCategories = async ({ page = 1, limit = 10, search = '' }) => {
       totalPages: Math.ceil(total / limit)
     }
   } catch (error) {
-    console.error('Lỗi khi lấy danh sách danh mục blog:', error)
-    throw new AppError('Lỗi server khi lấy danh sách danh mục blog', 500)
+    console.error('Lỗi khi lấy danh sách tính năng sản phẩm:', error)
+    throw new AppError('Lỗi server khi lấy danh sách tính năng sản phẩm', 500)
   }
 }
 
-const getCategoryById = async id => {
+const getCharacteristicById = async id => {
   try {
     const result = await db.query(
-      'SELECT * FROM blog_categories WHERE id = $1',
+      'SELECT * FROM characteristic WHERE id = $1',
       [id]
     )
     return result.rows[0]
   } catch (error) {
-    console.error('Lỗi khi lấy chi tiết danh mục blog:', error)
-    throw new AppError('Lỗi server khi lấy thông tin danh mục blog', 500)
+    console.error('Lỗi khi lấy chi tiết tính năng sản phẩm:', error)
+    throw new AppError('Lỗi server khi lấy thông tin tính năng sản phẩm', 500)
   }
 }
 
-const getCategoryByIdPrivate = async id => {
+const getCharacteristicByName = async name => {
   try {
     const result = await db.query(
-      'SELECT * FROM blog_categories WHERE id = $1',
-      [id]
-    )
-    const category = result.rows[0]
-    const blog = await db.query(
-      'SELECT * FROM blog WHERE blog_category_id = $1',
-      [id]
-    )
-    category.blog = blog.rows
-    return category
-  } catch (error) {
-    console.error('Lỗi khi lấy chi tiết danh mục blog:', error)
-    throw new AppError('Lỗi server khi lấy thông tin danh mục blog', 500)
-  }
-}
-
-const getCategoryByName = async name => {
-  try {
-    const result = await db.query(
-      'SELECT * FROM blog_categories WHERE LOWER(name) = LOWER($1)',
+      'SELECT * FROM characteristic WHERE LOWER(name) = LOWER($1)',
       [name]
     )
     return result.rows[0]
   } catch (error) {
-    console.error('Lỗi khi kiểm tra tên danh mục blog:', error)
+    console.error('Lỗi khi kiểm tra tên tính năng sản phẩm:', error)
     throw error
   }
 }
 
-const createCategory = async name => {
+const createCharacteristic = async name => {
   try {
     // Kiểm tra tên danh mục đã tồn tại chưa
-    const existingCategory = await getCategoryByName(name)
+    const existingCategory = await getCharacteristicByName(name)
     if (existingCategory) {
-      throw new AppError('Tên danh mục blog đã tồn tại', 400)
+      throw new AppError('Tính năng đã tồn tại', 400)
     }
 
     const result = await db.query(
-      'INSERT INTO blog_categories(name) VALUES($1) RETURNING *',
+      'INSERT INTO characteristic(name) VALUES($1) RETURNING *',
       [name.trim()]
     )
     return result.rows[0]
@@ -115,40 +96,40 @@ const createCategory = async name => {
 
     if (error.code === '23505') {
       // Unique constraint violation
-      throw new AppError('Tên danh mục blog đã tồn tại', 400)
+      throw new AppError('Tính năng đã tồn tại', 400)
     }
 
-    console.error('Lỗi khi tạo danh mục blog:', error)
-    throw new AppError('Lỗi server khi tạo danh mục blog', 500)
+    console.error('Lỗi khi tạo tính năng sản phẩm:', error)
+    throw new AppError('Lỗi server khi tạo tính năng sản phẩm', 500)
   }
 }
 
-const updateCategory = async (id, name) => {
+const updateCharacteristic = async (id, name) => {
   try {
     // Kiểm tra danh mục có tồn tại không
-    const categoryExists = await getCategoryById(id)
+    const categoryExists = await getCharacteristicById(id)
     if (!categoryExists) {
-      throw new AppError('Danh mục blog không tồn tại', 404)
+      throw new AppError('tính năng sản phẩm không tồn tại', 404)
     }
 
     // Kiểm tra tên mới có trùng với danh mục khác không
     if (name && name.trim()) {
       const existingCategory = await db.query(
-        'SELECT * FROM blog_categories WHERE LOWER(name) = LOWER($1) AND id != $2',
+        'SELECT * FROM characteristic WHERE LOWER(name) = LOWER($1) AND id != $2',
         [name.trim(), id]
       )
       if (existingCategory.rows.length > 0) {
-        throw new AppError('Tên danh mục blog đã tồn tại', 400)
+        throw new AppError('Tính năng đã tồn tại', 400)
       }
     }
 
     const result = await db.query(
-      'UPDATE blog_categories SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      'UPDATE characteristic SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
       [name.trim(), id]
     )
 
     if (result.rows.length === 0) {
-      throw new AppError('Không tìm thấy danh mục blog', 404)
+      throw new AppError('Không tìm thấy tính năng sản phẩm', 404)
     }
 
     return result.rows[0]
@@ -159,27 +140,28 @@ const updateCategory = async (id, name) => {
 
     if (error.code === '23505') {
       // Unique constraint violation
-      throw new AppError('Tên danh mục blog đã tồn tại', 400)
+      throw new AppError('Tính năng đã tồn tại', 400)
     }
 
-    console.error('Lỗi khi cập nhật danh mục blog:', error)
-    throw new AppError('Lỗi server khi cập nhật danh mục blog', 500)
+    console.error('Lỗi khi cập nhật tính năng sản phẩm:', error)
+    throw new AppError('Lỗi server khi cập nhật tính năng sản phẩm', 500)
   }
 }
 
-const deleteCategory = async id => {
+const deleteCharacteristic = async id => {
   try {
     // Kiểm tra danh mục có tồn tại không
-    const categoryExists = await getCategoryById(id)
+    const categoryExists = await getCharacteristicById(id)
     if (!categoryExists) {
-      throw new AppError('Danh mục blog không tồn tại', 404)
+      throw new AppError('tính năng sản phẩm không tồn tại', 404)
     }
 
     // Kiểm tra xem danh mục có blog nào không
     const checkQuery = `
       SELECT COUNT(*) as blog_count 
-      FROM blog 
-      WHERE blog_category_id = $1
+      FROM products p 
+      INNER JOIN characteristic_product ct ON p.id = ct.product_id
+      WHERE characteristic_id = $1
     `
     const checkResult = await db.query(checkQuery, [id])
     const blogCount = parseInt(checkResult.rows[0].blog_count)
@@ -193,12 +175,12 @@ const deleteCategory = async id => {
 
     // Thực hiện xóa
     const result = await db.query(
-      'DELETE FROM blog_categories WHERE id = $1 RETURNING *',
+      'DELETE FROM characteristic WHERE id = $1 RETURNING *',
       [id]
     )
 
     if (result.rows.length === 0) {
-      throw new AppError('Không tìm thấy danh mục blog', 404)
+      throw new AppError('Không tìm thấy tính năng sản phẩm', 404)
     }
 
     return {
@@ -228,11 +210,9 @@ const deleteCategory = async id => {
 }
 
 module.exports = {
-  getAllCategories,
-  getCategoryById,
-  getCategoryByIdPrivate,
-  getCategoryByName,
-  createCategory,
-  updateCategory,
-  deleteCategory
+  getAllCharacteristic,
+  getCharacteristicById,
+  createCharacteristic,
+  updateCharacteristic,
+  deleteCharacteristic
 }

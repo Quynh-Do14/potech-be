@@ -50,6 +50,17 @@ const getCategoryById = async id => {
   return result.rows[0]
 }
 
+const getCategoryByIdPrivate = async id => {
+  const result = await db.query('SELECT * FROM categories WHERE id = $1', [id])
+  const category = result.rows[0]
+  const products = await db.query(
+    'SELECT * FROM products WHERE category_id = $1',
+    [id]
+  )
+  category.products = products.rows
+  return category
+}
+
 const createCategory = async ({ name, image, description }) => {
   try {
     const result = await db.query(
@@ -174,6 +185,7 @@ const deleteCategory = async id => {
 module.exports = {
   getAllCategories,
   getCategoryById,
+  getCategoryByIdPrivate,
   createCategory,
   updateCategory,
   deleteCategory

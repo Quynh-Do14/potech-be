@@ -57,10 +57,10 @@ const createContact = async (name, email, phone_number, message) => {
   return result.rows[0]
 }
 
-const updateContact = async (id, name, email, phone_number, message) => {
+const updateContact = async (id, status) => {
   const result = await db.query(
-    'UPDATE contacts SET name = $1, name = $2, email = $3, message = $4 WHERE id = $5 RETURNING *',
-    [name, email, phone_number, message, id]
+    'UPDATE contacts SET status = $1 WHERE id = $2 RETURNING *',
+    [status, id]
   )
   return result.rows[0]
 }

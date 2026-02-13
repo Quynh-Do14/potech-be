@@ -201,17 +201,19 @@ const createBLog = async ({
   short_description,
   blog_category_id,
   active,
+  is_draft,
   image,
   user_id
 }) => {
   const res = await db.query(
-    'INSERT INTO blog (title, description, short_description, blog_category_id, active, image, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+    'INSERT INTO blog (title, description, short_description, blog_category_id, active, is_draft, image, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
     [
       title,
       description,
       short_description,
       blog_category_id,
       active,
+      is_draft,
       image,
       user_id
     ]
@@ -221,30 +223,40 @@ const createBLog = async ({
 
 const updateBLog = async (
   id,
-  { title, description, short_description, blog_category_id, active, image }
+  {
+    title,
+    description,
+    short_description,
+    blog_category_id,
+    active,
+    is_draft,
+    image
+  }
 ) => {
   const fields = [
     'title',
     'description',
     'short_description',
     'blog_category_id',
-    'active'
+    'active',
+    'is_draft'
   ]
   const values = [
     title,
     description,
     short_description,
     blog_category_id,
-    active
+    active,
+    is_draft
   ]
   let query =
-    'UPDATE blog SET title = $1, description = $2, short_description =$3, blog_category_id = $4, active = $5'
+    'UPDATE blog SET title = $1, description = $2, short_description =$3, blog_category_id = $4, active = $5, is_draft = $6'
 
   if (image !== undefined && image !== null && image !== '') {
     fields.push('image')
     values.push(image)
     query =
-      'UPDATE blog SET title = $1, description = $2, short_description =$3, blog_category_id = $4, active = $5, image = $6'
+      'UPDATE blog SET title = $1, description = $2, short_description =$3, blog_category_id = $4, active = $5, is_draft = $6, image = $7'
   }
 
   query += ` WHERE id = $${fields.length + 1} RETURNING *`

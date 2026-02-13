@@ -105,12 +105,16 @@ const create = async (req, res) => {
 
     // ✅ Parse productFigure từ body
     const productFigure = JSON.parse(req.body.productFigure || '[]')
+    const characteristic_product = JSON.parse(
+      req.body.characteristic_product || '[]'
+    )
 
     // ✅ Tạo sản phẩm
     const product = await productModel.createProduct(
       req.body,
       imageUrls,
       productFigure,
+      characteristic_product,
       image // 👈 Truyền thêm ảnh chính
     )
 
@@ -138,6 +142,10 @@ const update = async (req, res) => {
 
     const productFigure = JSON.parse(req.body.productFigure || '[]')
 
+    const characteristic_product = JSON.parse(
+      req.body.characteristic_product || '[]'
+    )
+
     // Ảnh chính (image: chỉ lấy phần tử đầu tiên nếu tồn tại)
     const singleImage = req.files?.image?.[0]
       ? `/uploads/${req.files.image[0].filename}`
@@ -149,6 +157,7 @@ const update = async (req, res) => {
       newImageUrls,
       remainingImages,
       productFigure,
+      characteristic_product,
       singleImage // 👉 truyền thêm vào
     )
 

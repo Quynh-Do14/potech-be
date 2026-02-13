@@ -210,6 +210,15 @@ const getProductById = async id => {
   )
   product.productFigure = figureRes.rows
 
+  const characteristicProduct = await db.query(
+    `SELECT cp.*, ch.name as characteristic_name 
+         FROM characteristic_product cp 
+         LEFT JOIN characteristic ch ON cp.characteristic_id = ch.id 
+         WHERE cp.product_id = $1`,
+    [id]
+  )
+  
+  product.characteristicProduct = characteristicProduct.rows
   // 4. Lấy các sản phẩm cùng danh mục (trừ chính nó)
   const sameCategoryRes = await db.query(
     `
@@ -267,6 +276,15 @@ const getProductByIdPrivate = async id => {
   )
   product.productFigure = figureRes.rows
 
+  const characteristicProduct = await db.query(
+    `SELECT cp.*, ch.name as characteristic_name 
+         FROM characteristic_product cp 
+         LEFT JOIN characteristic ch ON cp.characteristic_id = ch.id 
+         WHERE cp.product_id = $1`,
+    [id]
+  )
+  product.characteristicProduct = characteristicProduct.rows
+
   return product
 }
 
@@ -274,6 +292,7 @@ const createProduct = async (
   data,
   imageUrls = [],
   productFigure = [],
+  characteristic_product = [],
   image = null
 ) => {
   const {
@@ -324,6 +343,12 @@ const createProduct = async (
       [productId, figure.key, figure.value]
     )
   }
+  for (const type of characteristic_product) {
+    await db.query(
+      `INSERT INTO characteristic_product (product_id, characteristic_id) VALUES ($1, $2)`,
+      [productId, type]
+    )
+  }
 
   return { id: productId }
 }
@@ -331,9 +356,11 @@ const createProduct = async (
 const updateProduct = async (
   id,
   data,
+
   newImageUrls = [],
   remainingImages = [],
   productFigure = [],
+  characteristic_product = [],
   image = null // ảnh chính (thumbnail)
 ) => {
   const {
@@ -408,6 +435,16 @@ const updateProduct = async (
     await db.query(
       `INSERT INTO product_figures (product_id, key, value) VALUES ($1, $2, $3)`,
       [id, figure.key, figure.value]
+    )
+  }
+
+  await db.query(`DELETE FROM characteristic_product WHERE product_id = $1`, [
+    id
+  ])
+  for (const type of characteristic_product) {
+    await db.query(
+      `INSERT INTO characteristic_product (product_id, characteristic_id) VALUES ($1, $2)`,
+      [id, type]
     )
   }
 

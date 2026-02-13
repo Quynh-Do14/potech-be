@@ -69,8 +69,14 @@ const create = async (req, res) => {
       return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
     }
 
-    const { title, description, short_description, blog_category_id, active } =
-      req.body
+    const {
+      title,
+      description,
+      short_description,
+      blog_category_id,
+      active,
+      is_draft
+    } = req.body
     const image = req.file ? `/uploads/${req.file.filename}` : null
 
     const blog = await blogModel.createBLog({
@@ -80,6 +86,7 @@ const create = async (req, res) => {
       blog_category_id,
       active,
       image,
+      is_draft,
       user_id: req.user.id
     })
     res.status(201).json(blog)
@@ -98,8 +105,14 @@ const update = async (req, res) => {
       return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
     }
 
-    const { title, description, short_description, blog_category_id, active } =
-      req.body
+    const {
+      title,
+      description,
+      short_description,
+      blog_category_id,
+      active,
+      is_draft
+    } = req.body
     const image = req.file
       ? `/uploads/${req.file.filename}`
       : req.body.image || null
@@ -109,6 +122,7 @@ const update = async (req, res) => {
       short_description,
       blog_category_id,
       active,
+      is_draft,
       image
     })
     res.status(201).json(blog)

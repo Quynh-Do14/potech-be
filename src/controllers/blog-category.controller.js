@@ -23,6 +23,12 @@ const getById = async (req, res) => {
   res.json(category)
 }
 
+const getByIdPrivate = async (req, res) => {
+  const category = await blogCategoryModel.getCategoryByIdPrivate(req.params.id)
+  if (!category) return res.status(404).json({ message: 'Category not found' })
+  res.json(category)
+}
+
 const create = async (req, res, next) => {
   try {
     // Kiểm tra quyền truy cập
@@ -83,7 +89,7 @@ const update = async (req, res, next) => {
     }
 
     const category = await blogCategoryModel.updateCategory(id, name.trim())
-    
+
     if (!category) {
       throw new AppError('Không tìm thấy danh mục blog', 404)
     }
@@ -133,10 +139,11 @@ const remove = async (req, res, next) => {
   }
 }
 
-module.exports = { 
-  getAll, 
-  getById, 
-  create, 
-  update, 
-  remove,
+module.exports = {
+  getAll,
+  getById,
+  getByIdPrivate,
+  create,
+  update,
+  remove
 }

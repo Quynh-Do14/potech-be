@@ -39,20 +39,14 @@ const create = async (req, res) => {
   res.status(201).json(category)
 }
 
-const update = async (req, res) => {
+const updateStatus = async (req, res) => {
   const profile = await userModel.findUserById(req.user.id)
   const allowedRoles = [ROLES.ADMIN, ROLES.SELLER]
 
   if (!allowedRoles.includes(profile.role_name))
     return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
-  const { name, email, phone_number, message } = req.body
-  const category = await contactModel.updateContact(
-    req.params.id,
-    name,
-    email,
-    phone_number,
-    message
-  )
+  const { status } = req.body
+  const category = await contactModel.updateContact(req.params.id, status)
   if (!category) return res.status(404).json({ message: 'Category not found' })
   res.json(category)
 }
@@ -68,4 +62,4 @@ const remove = async (req, res) => {
   res.json({ message: 'Category deleted' })
 }
 
-module.exports = { getAll, getById, create, update, remove }
+module.exports = { getAll, getById, create, updateStatus, remove }
