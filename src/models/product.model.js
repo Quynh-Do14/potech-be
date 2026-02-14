@@ -1,4 +1,5 @@
 const db = require('../config/database')
+const AppError = require('../utils/AppError')
 
 const getAllProducts = async ({
   page = 1,
@@ -62,7 +63,7 @@ const getAllProducts = async ({
   }
 
   // Thêm ORDER BY và pagination
-  query += ` ORDER BY p.id DESC`
+  query += ` ORDER BY p.index ASC`
 
   // Thêm limit và offset
   queryParams.push(limit)
@@ -217,7 +218,7 @@ const getProductById = async id => {
          WHERE cp.product_id = $1`,
     [id]
   )
-  
+
   product.characteristicProduct = characteristicProduct.rows
   // 4. Lấy các sản phẩm cùng danh mục (trừ chính nó)
   const sameCategoryRes = await db.query(
@@ -303,15 +304,25 @@ const createProduct = async (
     price_sale,
     category_id,
     brand_id,
-    active
+    active,
+    index
   } = data
+
+  const existingIndex = await db.query(
+    'SELECT id FROM products WHERE index = $1',
+    [index]
+  )
+
+  if (existingIndex.rows.length > 0) {
+    throw new AppError(`Số thứ tự ${index} đã tồn tại`, 400) // ✅ Giữ nguyên
+  }
 
   // 1. Insert sản phẩm
   const result = await db.query(
     `INSERT INTO products (
       name, description, short_description,
-      price, price_sale, category_id, brand_id, active, image
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      price, price_sale, category_id, brand_id, active, index, image
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     RETURNING id`,
     [
       name,
@@ -322,6 +333,7 @@ const createProduct = async (
       category_id,
       brand_id,
       active,
+      index,
       image
     ]
   )
@@ -356,7 +368,6 @@ const createProduct = async (
 const updateProduct = async (
   id,
   data,
-
   newImageUrls = [],
   remainingImages = [],
   productFigure = [],
@@ -371,8 +382,29 @@ const updateProduct = async (
     price_sale,
     category_id,
     brand_id,
-    active
+    active,
+    index
   } = data
+  // Kiểm tra product tồn tại
+  const checkExist = await db.query('SELECT id FROM products WHERE id = $1', [
+    id
+  ])
+
+  if (checkExist.rows.length === 0) {
+    throw new AppError('Không tìm thấy sản phẩm', 404)
+  }
+
+  // Kiểm tra index đã tồn tại chưa (nếu có)
+  if (index !== undefined && index !== null) {
+    const existingOrder = await db.query(
+      'SELECT id FROM products WHERE index = $1 AND id != $2',
+      [index, id]
+    )
+
+    if (existingOrder.rows.length > 0) {
+      throw new AppError(`Số thứ tự ${index} đã tồn tại`, 400) // ✅ Giữ nguyên
+    }
+  }
 
   let updateQuery = `
     UPDATE products SET 
@@ -383,7 +415,8 @@ const updateProduct = async (
       price_sale=$5,
       category_id=$6, 
       brand_id=$7,
-      active=$8`
+      active=$8,
+      index=$9`
   const params = [
     name,
     description,
@@ -392,16 +425,17 @@ const updateProduct = async (
     price_sale,
     category_id,
     brand_id,
-    active
+    active,
+    index
   ]
 
   if (image) {
-    updateQuery += `, image=$9`
+    updateQuery += `, image=$10`
     params.push(image)
-    updateQuery += ` WHERE id=$10 RETURNING *`
+    updateQuery += ` WHERE id=$11 RETURNING *`
     params.push(id)
   } else {
-    updateQuery += ` WHERE id=$9 RETURNING *`
+    updateQuery += ` WHERE id=$10 RETURNING *`
     params.push(id)
   }
 
@@ -451,6 +485,98 @@ const updateProduct = async (
   return result.rows[0]
 }
 
+const updateProductIndex = async items => {
+  try {
+    // Validate dữ liệu trước
+    for (const item of items) {
+      const { id, index } = item
+
+      if (!id || isNaN(parseInt(id))) {
+        throw new AppError(`ID không hợp lệ: ${id}`, 400)
+      }
+
+      if (index === undefined || index === null || isNaN(parseInt(index))) {
+        throw new AppError(`Thứ tự hiển thị không hợp lệ cho ID ${id}`, 400)
+      }
+    }
+
+    // Lấy danh sách ID để kiểm tra tồn tại
+    const ids = items.map(item => item.id)
+    const checkExist = await db.query(
+      'SELECT id FROM products WHERE id = ANY($1::int[])',
+      [ids]
+    )
+
+    if (checkExist.rows.length !== ids.length) {
+      const existingIds = checkExist.rows.map(row => row.id)
+      const notFoundIds = ids.filter(id => !existingIds.includes(id))
+      throw new AppError(
+        `Không tìm thấy sản phẩm với ID: ${notFoundIds.join(', ')}`,
+        404
+      )
+    }
+
+    // Kiểm tra index không trùng nhau trong request
+    const orders = items.map(item => item.index)
+    const uniqueOrders = [...new Set(orders)]
+    if (orders.length !== uniqueOrders.length) {
+      throw new AppError(
+        'Các thứ tự hiển thị không được trùng nhau trong request',
+        400
+      )
+    }
+
+    // Kiểm tra index không bị trùng với sản phẩm khác ngoài danh sách đang cập nhật
+    const existingOrder = await db.query(
+      'SELECT index FROM products WHERE index = ANY($1::int[]) AND id != ALL($2::int[])',
+      [orders, ids]
+    )
+
+    if (existingOrder.rows.length > 0) {
+      const duplicateOrders = existingOrder.rows.map(row => row.index)
+      throw new AppError(
+        `Các thứ tự hiển thị ${duplicateOrders.join(
+          ', '
+        )} đã tồn tại ở sản phẩm khác`,
+        400
+      )
+    }
+
+    // Xây dựng câu query CASE WHEN để cập nhật tất cả cùng lúc
+    let caseWhen = ''
+    let params = []
+    let paramIndex = 1
+
+    items.forEach((item, i) => {
+      caseWhen += `WHEN id = $${paramIndex} THEN $${paramIndex + 1} `
+      params.push(item.id, item.index)
+      paramIndex += 2
+    })
+
+    const query = `
+      UPDATE products 
+      SET index = CASE 
+        ${caseWhen}
+        ELSE index 
+      END
+      WHERE id IN (${items.map((_, i) => `$${i * 2 + 1}`).join(', ')})
+      RETURNING id, index, name
+    `
+
+    const result = await db.query(query, params)
+
+    return {
+      success: true,
+      message: 'Cập nhật thứ tự hiển thị thành công',
+      data: result.rows
+    }
+  } catch (error) {
+    if (error instanceof AppError) throw error
+    console.error('Lỗi khi cập nhật thứ tự hiển thị hàng loạt:', error)
+    throw new AppError('Lỗi server khi cập nhật thứ tự hiển thị', 500)
+  }
+}
+
 const deleteProduct = async id => {
   await db.query(`DELETE FROM products WHERE id = $1`, [id])
 }
@@ -462,5 +588,6 @@ module.exports = {
   getProductByIdPrivate,
   createProduct,
   updateProduct,
+  updateProductIndex,
   deleteProduct
 }

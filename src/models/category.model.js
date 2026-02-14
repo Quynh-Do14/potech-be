@@ -24,7 +24,7 @@ const getAllCategories = async ({ page = 1, limit = 10, search = '' }) => {
   // Thêm phân trang
   queryParams.push(limit)
   queryParams.push(offset)
-  query += ` ORDER BY id DESC LIMIT $${queryParams.length - 1} OFFSET $${
+  query += ` ORDER BY index ASC LIMIT $${queryParams.length - 1} OFFSET $${
     queryParams.length
   }`
 
@@ -61,28 +61,56 @@ const getCategoryByIdPrivate = async id => {
   return category
 }
 
-const createCategory = async ({ name, image, description }) => {
+const createCategory = async ({ name, image, description, index }) => {
   try {
+    // Kiểm tra index đã tồn tại chưa (nếu có index)
+    if (index !== undefined && index !== null) {
+      const existingIndex = await db.query(
+        'SELECT id FROM categories WHERE index = $1',
+        [index]
+      )
+
+      if (existingIndex.rows.length > 0) {
+        throw new AppError(`Số thứ tự ${index} đã tồn tại`, 400)
+      }
+    }
+
     const result = await db.query(
-      'INSERT INTO categories(name, image, description) VALUES($1, $2, $3) RETURNING *',
-      [name, image, description]
+      'INSERT INTO categories(name, image, description, index) VALUES($1, $2, $3, $4) RETURNING *',
+      [name, image, description, index || null] // Cho phép index null
     )
     return result.rows[0]
   } catch (error) {
     if (error.code === '23505') {
-      // Duplicate name
+      // Unique constraint for name
       throw new AppError('Tên danh mục đã tồn tại', 400)
     }
     throw error
   }
 }
 
-const updateCategory = async (id, name) => {
+const updateCategory = async (id, name, description, index, image) => {
   try {
     // Kiểm tra danh mục có tồn tại không
-    const categoryExists = await getCategoryById(id)
-    if (!categoryExists) {
-      throw new AppError('Danh mục blog không tồn tại', 404)
+    const categoryExists = await db.query(
+      'SELECT id FROM categories WHERE id = $1',
+      [id]
+    )
+
+    if (categoryExists.rows.length === 0) {
+      throw new AppError('Danh mục không tồn tại', 404)
+    }
+
+    // Kiểm tra index đã tồn tại chưa (nếu có index và khác với index cũ)
+    if (index !== undefined && index !== null) {
+      const existingOrder = await db.query(
+        'SELECT id FROM categories WHERE index = $1 AND id != $2',
+        [index, id]
+      )
+
+      if (existingOrder.rows.length > 0) {
+        throw new AppError(`Số thứ tự ${index} đã tồn tại`, 400)
+      }
     }
 
     // Kiểm tra tên mới có trùng với danh mục khác không
@@ -92,18 +120,50 @@ const updateCategory = async (id, name) => {
         [String(name).trim(), id]
       )
       if (existingCategory.rows.length > 0) {
-        throw new AppError('Tên danh mục blog đã tồn tại', 400)
+        throw new AppError('Tên danh mục đã tồn tại', 400)
       }
     }
 
-    const result = await db.query(
-      'UPDATE categories SET name = $1 WHERE id = $2 RETURNING *',
-      [String(name).trim(), id]
-    )
+    // Xây dựng câu update động
+    let updateFields = []
+    let params = []
+    let paramIndex = 1
 
-    if (result.rows.length === 0) {
-      throw new AppError('Không tìm thấy danh mục blog', 404)
+    if (name !== undefined) {
+      updateFields.push(`name = $${paramIndex}`)
+      params.push(String(name).trim())
+      paramIndex++
     }
+
+    if (description !== undefined) {
+      updateFields.push(`description = $${paramIndex}`)
+      params.push(description)
+      paramIndex++
+    }
+
+    if (index !== undefined) {
+      updateFields.push(`index = $${paramIndex}`)
+      params.push(index)
+      paramIndex++
+    }
+
+    if (image !== undefined) {
+      updateFields.push(`image = $${paramIndex}`)
+      params.push(image)
+      paramIndex++
+    }
+
+    // Thêm id vào params
+    params.push(id)
+
+    const query = `
+      UPDATE categories 
+      SET ${updateFields.join(', ')} 
+      WHERE id = $${paramIndex} 
+      RETURNING *
+    `
+
+    const result = await db.query(query, params)
 
     return result.rows[0]
   } catch (error) {
@@ -112,12 +172,103 @@ const updateCategory = async (id, name) => {
     }
 
     if (error.code === '23505') {
-      // Unique constraint violation
-      throw new AppError('Tên danh mục blog đã tồn tại', 400)
+      throw new AppError('Tên danh mục đã tồn tại', 400)
     }
 
-    console.error('Lỗi khi cập nhật danh mục blog:', error)
-    throw new AppError('Lỗi server khi cập nhật danh mục blog', 500)
+    console.error('Lỗi khi cập nhật danh mục:', error)
+    throw new AppError('Lỗi server khi cập nhật danh mục', 500)
+  }
+}
+
+const updateCategoriesIndex = async items => {
+  try {
+    // Validate dữ liệu trước
+    for (const item of items) {
+      const { id, index } = item
+
+      if (!id || isNaN(parseInt(id))) {
+        throw new AppError(`ID không hợp lệ: ${id}`, 400)
+      }
+
+      if (index === undefined || index === null || isNaN(parseInt(index))) {
+        throw new AppError(`Số thứ tự không hợp lệ cho ID ${id}`, 400) // ✅ Sửa message
+      }
+    }
+
+    // Lấy danh sách ID để kiểm tra tồn tại
+    const ids = items.map(item => item.id)
+    const checkExist = await db.query(
+      'SELECT id FROM categories WHERE id = ANY($1::int[])',
+      [ids]
+    )
+
+    if (checkExist.rows.length !== ids.length) {
+      const existingIds = checkExist.rows.map(row => row.id)
+      const notFoundIds = ids.filter(id => !existingIds.includes(id))
+      throw new AppError(
+        `Không tìm thấy danh mục với ID: ${notFoundIds.join(', ')}`, // ✅ Sửa từ "sản phẩm" thành "danh mục"
+        404
+      )
+    }
+
+    // Kiểm tra index không trùng nhau trong request
+    const indexes = items.map(item => item.index)
+    const uniqueIndexes = [...new Set(indexes)]
+    if (indexes.length !== uniqueIndexes.length) {
+      throw new AppError(
+        'Các số thứ tự không được trùng nhau trong request', // ✅ Sửa message
+        400
+      )
+    }
+
+    // Kiểm tra index không bị trùng với danh mục khác ngoài danh sách đang cập nhật
+    const existingOrder = await db.query(
+      'SELECT index FROM categories WHERE index = ANY($1::int[]) AND id != ALL($2::int[])',
+      [indexes, ids]
+    )
+
+    if (existingOrder.rows.length > 0) {
+      const duplicateOrders = existingOrder.rows.map(row => row.index)
+      throw new AppError(
+        `Các số thứ tự ${duplicateOrders.join(
+          ', '
+        )} đã tồn tại ở danh mục khác`, // ✅ Sửa message
+        400
+      )
+    }
+
+    // Xây dựng câu query CASE WHEN để cập nhật tất cả cùng lúc
+    let caseWhen = ''
+    let params = []
+    let paramIndex = 1
+
+    items.forEach((item, i) => {
+      caseWhen += `WHEN id = $${paramIndex} THEN $${paramIndex + 1} `
+      params.push(item.id, item.index)
+      paramIndex += 2
+    })
+
+    const query = `
+      UPDATE categories 
+      SET index = CASE 
+        ${caseWhen}
+        ELSE index 
+      END
+      WHERE id IN (${items.map((_, i) => `$${i * 2 + 1}`).join(', ')})
+      RETURNING id, index, name
+    `
+
+    const result = await db.query(query, params)
+
+    return {
+      success: true,
+      message: 'Cập nhật số thứ tự thành công', // ✅ Sửa message
+      data: result.rows
+    }
+  } catch (error) {
+    if (error instanceof AppError) throw error
+    console.error('Lỗi khi cập nhật số thứ tự hàng loạt:', error) // ✅ Sửa log
+    throw new AppError('Lỗi server khi cập nhật số thứ tự', 500) // ✅ Sửa message
   }
 }
 
@@ -188,5 +339,6 @@ module.exports = {
   getCategoryByIdPrivate,
   createCategory,
   updateCategory,
+  updateCategoriesIndex,
   deleteCategory
 }

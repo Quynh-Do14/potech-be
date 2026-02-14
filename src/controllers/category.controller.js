@@ -43,7 +43,7 @@ const create = async (req, res, next) => {
     throw new AppError('Không có quyền thực hiện hành động này', 403)
   }
   try {
-    const { name, description } = req.body
+    const { name, description, index } = req.body
 
     // Validate dữ liệu đầu vào
     if (!name || name.trim() === '') {
@@ -59,6 +59,7 @@ const create = async (req, res, next) => {
     const newCategory = await categoryModel.createCategory({
       name: name.trim(),
       description: description ? description.trim() : null,
+      index,
       image
     })
 
@@ -83,12 +84,7 @@ const update = async (req, res, next) => {
     }
 
     const { id } = req.params
-    const { name, description, image } = req.body
-
-    // Validate input
-    if (!id || isNaN(parseInt(id))) {
-      throw new AppError('ID không hợp lệ', 400)
-    }
+    const { name, description, image, index } = req.body
 
     if (!name || name.trim() === '') {
       throw new AppError('Tên danh mục blog là bắt buộc', 400)
@@ -102,6 +98,7 @@ const update = async (req, res, next) => {
       id,
       name.trim(),
       description,
+      index,
       image
     )
 
@@ -113,6 +110,72 @@ const update = async (req, res, next) => {
       success: true,
       message: 'Cập nhật danh mục blog thành công',
       data: category
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+const updateIndexes = async (req, res, next) => {
+  try {
+    // Kiểm tra quyền truy cập
+    const profile = await userModel.findUserById(req.user.id)
+    const allowedRoles = [ROLES.ADMIN, ROLES.SELLER]
+
+    if (!allowedRoles.includes(profile.role_name)) {
+      throw new AppError('Không có quyền thực hiện hành động này', 403)
+    }
+
+    const { items } = req.body
+
+    // Validate items
+    if (!items || !Array.isArray(items)) {
+      throw new AppError('Danh sách items không hợp lệ', 400)
+    }
+
+    if (items.length === 0) {
+      throw new AppError('Danh sách items không được để trống', 400)
+    }
+
+    if (items.length > 100) {
+      throw new AppError('Chỉ được cập nhật tối đa 100 items cùng lúc', 400)
+    }
+
+    // Kiểm tra trùng lặp ID trong request
+    const ids = items.map(item => item.id)
+    const uniqueIds = [...new Set(ids)]
+
+    if (ids.length !== uniqueIds.length) {
+      throw new AppError('Phát hiện ID trùng lặp trong request', 400)
+    }
+
+    // Validate từng item
+    for (const item of items) {
+      if (!item.id || isNaN(parseInt(item.id))) {
+        throw new AppError(`ID không hợp lệ: ${item.id}`, 400)
+      }
+
+      if (
+        item.index === undefined ||
+        item.index === null ||
+        isNaN(parseInt(item.index))
+      ) {
+        throw new AppError(`Số thứ tự không hợp lệ cho ID ${item.id}`, 400)
+      }
+
+      const indexNum = parseInt(item.index)
+      if (indexNum < 0) {
+        throw new AppError(`Số thứ tự không được âm cho ID ${item.id}`, 400)
+      }
+    }
+
+    // Gọi model để cập nhật
+    const result = await categoryModel.updateCategoriesIndex(items)
+
+    res.json({
+      success: true,
+      message: 'Cập nhật số thứ tự thành công',
+      data: result.data
     })
   } catch (error) {
     next(error)
@@ -158,5 +221,6 @@ module.exports = {
   getByIdPrivate,
   create,
   update,
+  updateIndexes,
   remove
 }

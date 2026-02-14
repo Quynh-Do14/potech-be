@@ -15,6 +15,12 @@ router.post(
   categoryController.create
 )
 router.put(
+  '/update-index',
+  authenticate,
+  //   upload.single('image'),
+  categoryController.updateIndexes
+)
+router.put(
   '/:id',
   authenticate,
   //   upload.single('image'),
