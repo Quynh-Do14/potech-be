@@ -40,7 +40,7 @@ const getAllBLog = async ({
 
   // Gắn điều kiện WHERE nếu có
   if (conditions.length > 0) {
-    const whereClause = ` WHERE ${conditions.join(' AND ')}`
+    const whereClause = ` AND ${conditions.join(' AND ')}`
     query += whereClause
     countQuery += whereClause
   }
