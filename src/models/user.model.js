@@ -170,7 +170,7 @@ const findUserById = async id => {
   const result = await db.query(
     `
       SELECT 
-        u.id, u.name, u.email, u.role_id, u.active, u.phone_number, u.created_at,
+        u.id, u.name, u.email, u.role_id, u.active, u.phone_number, u.password, u.created_at,
         r.name AS role_name
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id
