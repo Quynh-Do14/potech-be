@@ -24,7 +24,7 @@ const agencyCategoryRoutes = require('./src/routers/agency-category.routes')
 const videoRoutes = require('./src/routers/video.routes')
 const contactRoutes = require('./src/routers/contact.routes')
 const characteristicRoutes = require('./src/routers/characteristic.routes')
-
+const uploadRoutes = require('./src/routers/upload.routes')
 const app = express()
 const PORT = process.env.PORT || 3000
 
@@ -50,6 +50,7 @@ app.use('/api/contact', contactRoutes)
 app.use('/api/characteristic', characteristicRoutes)
 
 app.use('/api/uploads', express.static('src/uploads'))
+app.use('/api/upload', uploadRoutes)
 // Health check
 app.get('/', (req, res) => {
   res.send('API is running...')
