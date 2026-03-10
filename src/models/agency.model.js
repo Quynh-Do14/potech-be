@@ -271,6 +271,8 @@ const createAgency = async ({
   lat,
   long,
   phone_number,
+  phone_number_2,
+  phone_number_3,
   province,
   district,
   star_rate,
@@ -279,13 +281,15 @@ const createAgency = async ({
   image
 }) => {
   const result = await db.query(
-    'INSERT INTO agency(name, address, lat, long, phone_number,province, district, star_rate, active, image) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+    'INSERT INTO agency(name, address, lat, long, phone_number, phone_number_2, phone_number_3 ,province, district, star_rate, active, image) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
     [
       name,
       address,
       lat,
       long,
       phone_number,
+      phone_number_2,
+      phone_number_3,
       province,
       district,
       star_rate,
@@ -315,6 +319,8 @@ const updateAgency = async (
     lat,
     long,
     phone_number,
+    phone_number_2,
+    phone_number_3,
     province,
     district,
     star_rate,
@@ -351,6 +357,14 @@ const updateAgency = async (
   if (phone_number !== undefined) {
     fields.push('phone_number')
     values.push(phone_number)
+  }
+  if (phone_number !== undefined) {
+    fields.push('phone_number_2')
+    values.push(phone_number_2)
+  }
+  if (phone_number !== undefined) {
+    fields.push('phone_number_3')
+    values.push(phone_number_3)
   }
 
   if (province !== undefined) {
