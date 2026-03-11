@@ -162,7 +162,7 @@ const getBLogById = async id => {
   // Lấy các bài viết liên quan trong cùng danh mục, ngoại trừ bài viết hiện tại
   const relatedResult = await db.query(
     `
-    SELECT b.id, b.title, b.image , b.created_at
+    SELECT b.id, b.title, b.image , b.slug, b.created_at
     FROM blog b
     WHERE b.blog_category_id = $1 AND b.id != $2 AND b.active = true
     ORDER BY b.created_at DESC
