@@ -440,7 +440,7 @@ const updateProduct = async (
       category_id=$6, 
       brand_id=$7,
       active=$8,
-      index=$9
+      index=$9,
       slug=$10`
   const params = [
     name,
