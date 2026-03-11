@@ -211,10 +211,19 @@ const getProductById = async id => {
   )
   product.productFigure = figureRes.rows
 
+  const characteristicProduct = await db.query(
+    `SELECT cp.*, ch.name as characteristic_name 
+         FROM characteristic_product cp 
+         LEFT JOIN characteristic ch ON cp.characteristic_id = ch.id 
+         WHERE cp.product_id = $1`,
+    [product.id]
+  )
+
+  product.characteristicProduct = characteristicProduct.rows
   // 4. Lấy các sản phẩm cùng danh mục (trừ chính nó)
   const sameCategoryRes = await db.query(
     `
-    SELECT name, price, image, slug FROM products
+    SELECT * FROM products
     WHERE category_id = $1 AND id != $2 AND active = true
     ORDER BY created_at DESC
     LIMIT 6
@@ -233,7 +242,6 @@ const getProductById = async id => {
     `,
     [product.brand_id, product.id]
   )
-
   const productKeyword = await db.query(
     `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1`,
     [product.id]
@@ -272,12 +280,22 @@ const getProductByIdPrivate = async id => {
     `SELECT id, key, value FROM product_figures WHERE product_id = $1`,
     [id]
   )
+  product.productFigure = figureRes.rows
+
+  const characteristicProduct = await db.query(
+    `SELECT cp.*, ch.name as characteristic_name 
+         FROM characteristic_product cp 
+         LEFT JOIN characteristic ch ON cp.characteristic_id = ch.id 
+         WHERE cp.product_id = $1`,
+    [id]
+  )
+  product.characteristicProduct = characteristicProduct.rows
+
   const productKeyword = await db.query(
     `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1`,
     [id]
   )
   product.keyword = productKeyword.rows
-  product.productFigure = figureRes.rows
 
   return product
 }
