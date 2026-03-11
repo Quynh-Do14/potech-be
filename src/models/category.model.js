@@ -46,7 +46,9 @@ const getAllCategories = async ({ page = 1, limit = 10, search = '' }) => {
 }
 
 const getCategoryById = async id => {
-  const result = await db.query('SELECT * FROM categories WHERE id = $1', [id])
+  const result = await db.query('SELECT * FROM categories WHERE slug = $1', [
+    id
+  ])
   return result.rows[0]
 }
 
@@ -61,7 +63,7 @@ const getCategoryByIdPrivate = async id => {
   return category
 }
 
-const createCategory = async ({ name, image, description, index }) => {
+const createCategory = async ({ name, image, description, index, slug }) => {
   try {
     // Kiểm tra index đã tồn tại chưa (nếu có index)
     if (index !== undefined && index !== null) {
@@ -75,9 +77,29 @@ const createCategory = async ({ name, image, description, index }) => {
       }
     }
 
+    if (name) {
+      const existingCategory = await db.query(
+        'SELECT * FROM categories WHERE LOWER(name) = LOWER($1)',
+        [String(name).trim()]
+      )
+      if (existingCategory.rows.length > 0) {
+        throw new AppError('Tên danh mục đã tồn tại', 400)
+      }
+    }
+
+    if (slug) {
+      const existingCategory = await db.query(
+        'SELECT * FROM categories WHERE LOWER(slug) = LLOWER($1)',
+        [String(slug).trim()]
+      )
+      if (existingCategory.rows.length > 0) {
+        throw new AppError('Đường dẫn đã tồn tại', 400)
+      }
+    }
+
     const result = await db.query(
-      'INSERT INTO categories(name, image, description, index) VALUES($1, $2, $3, $4) RETURNING *',
-      [name, image, description, index || null] // Cho phép index null
+      'INSERT INTO categories(name, image, description, index, slug) VALUES($1, $2, $3, $4, $5) RETURNING *',
+      [name, image, description, index || null, slug] // Cho phép index null
     )
     return result.rows[0]
   } catch (error) {
@@ -89,7 +111,7 @@ const createCategory = async ({ name, image, description, index }) => {
   }
 }
 
-const updateCategory = async (id, name, description, index, image) => {
+const updateCategory = async (id, name, description, index, image, slug) => {
   try {
     // Kiểm tra danh mục có tồn tại không
     const categoryExists = await db.query(
@@ -124,6 +146,16 @@ const updateCategory = async (id, name, description, index, image) => {
       }
     }
 
+    if (slug) {
+      const existingCategory = await db.query(
+        'SELECT * FROM categories WHERE LOWER(slug) = LOWER($1) AND id != $2',
+        [String(slug).trim(), id]
+      )
+      if (existingCategory.rows.length > 0) {
+        throw new AppError('Đường dẫn đã tồn tại', 400)
+      }
+    }
+
     // Xây dựng câu update động
     let updateFields = []
     let params = []
@@ -144,6 +176,12 @@ const updateCategory = async (id, name, description, index, image) => {
     if (index !== undefined) {
       updateFields.push(`index = $${paramIndex}`)
       params.push(index)
+      paramIndex++
+    }
+
+    if (slug !== undefined) {
+      updateFields.push(`slug = $${paramIndex}`)
+      params.push(slug)
       paramIndex++
     }
 

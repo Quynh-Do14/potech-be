@@ -43,7 +43,7 @@ const create = async (req, res, next) => {
     throw new AppError('Không có quyền thực hiện hành động này', 403)
   }
   try {
-    const { name, description, index } = req.body
+    const { name, description, index, slug } = req.body
 
     // Validate dữ liệu đầu vào
     if (!name || name.trim() === '') {
@@ -60,7 +60,8 @@ const create = async (req, res, next) => {
       name: name.trim(),
       description: description ? description.trim() : null,
       index,
-      image
+      image,
+      slug
     })
 
     res.status(201).json({
@@ -84,7 +85,7 @@ const update = async (req, res, next) => {
     }
 
     const { id } = req.params
-    const { name, description, image, index } = req.body
+    const { name, description, image, index, slug } = req.body
 
     if (!name || name.trim() === '') {
       throw new AppError('Tên danh mục blog là bắt buộc', 400)
@@ -99,7 +100,8 @@ const update = async (req, res, next) => {
       name.trim(),
       description,
       index,
-      image
+      image,
+      slug
     )
 
     if (!category) {

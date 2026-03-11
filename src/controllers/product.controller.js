@@ -244,7 +244,7 @@ const updateIndexes = async (req, res, next) => {
   }
 }
 
-const remove = async (req, res) => {
+const remove = async (req, res, next) => {
   try {
     const profile = await userModel.findUserById(req.user.id)
     const allowedRoles = [ROLES.ADMIN, ROLES.SELLER]
@@ -254,8 +254,8 @@ const remove = async (req, res) => {
 
     await productModel.deleteProduct(req.params.id)
     res.json({ message: 'Đã xoá sản phẩm' })
-  } catch (err) {
-    res.status(500).json({ message: 'Lỗi xóa sản phẩm', error: err.message })
+  } catch (error) {
+    next(error)
   }
 }
 

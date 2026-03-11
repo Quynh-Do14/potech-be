@@ -139,7 +139,8 @@ const create = async (req, res) => {
     })
     res.status(201).json(newAgency)
   } catch (err) {
-    res.status(500).json({ message: err.message })
+    console.error(err)
+    next(err)
   }
 }
 
@@ -193,7 +194,8 @@ const update = async (req, res) => {
     if (!updated) return res.status(404).json({ message: 'Agency not found' })
     res.json(updated)
   } catch (err) {
-    res.status(500).json({ message: err.message })
+    console.error(err)
+    next(err)
   }
 }
 
@@ -211,7 +213,8 @@ const remove = async (req, res) => {
     await agencyModel.deleteAgency(req.params.id)
     res.json({ message: 'Agency deleted successfully' })
   } catch (error) {
-    res.status(500).json({ message: error.message })
+    console.error(err)
+    next(err)
   }
 }
 

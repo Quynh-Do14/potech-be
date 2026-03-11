@@ -1,4 +1,5 @@
 const db = require('../config/database')
+const AppError = require('../utils/AppError')
 
 const getAllBLog = async ({
   page = 1,
@@ -150,7 +151,7 @@ const getBLogById = async id => {
     FROM blog b
     LEFT JOIN blog_categories bc ON b.blog_category_id = bc.id
     LEFT JOIN users u ON b.user_id = u.id
-    WHERE b.id = $1 AND b.active = true
+    WHERE b.slug = $1 AND b.active = true
     `,
     [id]
   )
@@ -167,11 +168,18 @@ const getBLogById = async id => {
     ORDER BY b.created_at DESC
     LIMIT 5
     `,
-    [blog.blog_category_id, id]
+    [blog.blog_category_id, blog.id]
   )
+
+  const blogKeyword = await db.query(
+    `SELECT id, blog_id, keyword FROM blog_keyword WHERE blog_id = $1`,
+    [blog.id]
+  )
+  const keyword = blogKeyword.rows
 
   return {
     ...blog,
+    keyword,
     related_blogs: relatedResult.rows
   }
 }
@@ -189,6 +197,13 @@ const getBLogByIdPrivate = async id => {
     [id]
   )
 
+  const blogKeyword = await db.query(
+    `SELECT id, blog_id, keyword FROM blog_keyword WHERE blog_id = $1`,
+    [id]
+  )
+
+  blogResult.rows[0].keyword = blogKeyword.rows
+
   const blog = blogResult.rows[0]
   if (!blog) return null
 
@@ -203,10 +218,32 @@ const createBLog = async ({
   active,
   is_draft,
   image,
-  user_id
+  user_id,
+  slug,
+  keyword = []
 }) => {
+  if (title) {
+    const existingTitle = await db.query(
+      'SELECT * FROM blog WHERE LOWER(title) = LOWER($1)',
+      [String(title).trim()]
+    )
+    if (existingTitle.rows.length > 0) {
+      throw new AppError('Tên danh mục đã tồn tại', 400)
+    }
+  }
+
+  if (slug) {
+    const existingSlug = await db.query(
+      'SELECT * FROM blog WHERE LOWER(slug) = LOWER($1)',
+      [String(slug).trim()]
+    )
+    if (existingSlug.rows.length > 0) {
+      throw new AppError('Tên danh mục đã tồn tại', 400)
+    }
+  }
+
   const res = await db.query(
-    'INSERT INTO blog (title, description, short_description, blog_category_id, active, is_draft, image, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+    'INSERT INTO blog (title, description, short_description, blog_category_id, active, is_draft, image, user_id, slug) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
     [
       title,
       description,
@@ -215,9 +252,18 @@ const createBLog = async ({
       active,
       is_draft,
       image,
-      user_id
+      user_id,
+      slug
     ]
   )
+  const blogId = res.rows[0].id
+  for (const key of keyword) {
+    await db.query(
+      `INSERT INTO blog_keyword (blog_id,keyword) VALUES ($1, $2)`,
+      [blogId, key]
+    )
+  }
+
   return res.rows[0]
 }
 
@@ -230,39 +276,65 @@ const updateBLog = async (
     blog_category_id,
     active,
     is_draft,
-    image
+    image,
+    slug,
+    keyword = []
   }
 ) => {
-  const fields = [
-    'title',
-    'description',
-    'short_description',
-    'blog_category_id',
-    'active',
-    'is_draft'
-  ]
+  if (title) {
+    const existingTitle = await db.query(
+      'SELECT * FROM blog WHERE LOWER(title) = LOWER($1) AND id != $2',
+      [String(title).trim(), id]
+    )
+    if (existingTitle.rows.length > 0) {
+      throw new AppError('Tên danh mục đã tồn tại', 400)
+    }
+  }
+
+  if (slug) {
+    const existingSLug = await db.query(
+      'SELECT * FROM blog WHERE LOWER(slug) = LOWER($1) AND id != $2',
+      [String(slug).trim(), id]
+    )
+    if (existingSLug.rows.length > 0) {
+      throw new AppError('Đường dẫn đã tồn tại', 400)
+    }
+  }
+
   const values = [
     title,
     description,
     short_description,
     blog_category_id,
     active,
-    is_draft
+    is_draft,
+    slug
   ]
+
   let query =
-    'UPDATE blog SET title = $1, description = $2, short_description =$3, blog_category_id = $4, active = $5, is_draft = $6'
+    'UPDATE blog SET title = $1, description = $2, short_description = $3, blog_category_id = $4, active = $5, is_draft = $6, slug = $7'
+  let paramIndex = 8
 
   if (image !== undefined && image !== null && image !== '') {
-    fields.push('image')
+    query += `, image = $${paramIndex}`
     values.push(image)
-    query =
-      'UPDATE blog SET title = $1, description = $2, short_description =$3, blog_category_id = $4, active = $5, is_draft = $6, image = $7'
+    paramIndex++
   }
 
-  query += ` WHERE id = $${fields.length + 1} RETURNING *`
+  query += ` WHERE id = $${paramIndex} RETURNING *`
   values.push(id)
 
   const result = await db.query(query, values)
+
+  // 3. Insert thông số kỹ thuật
+  await db.query(`DELETE FROM blog_keyword WHERE blog_id = $1`, [id])
+  for (const key of keyword) {
+    await db.query(
+      `INSERT INTO blog_keyword (blog_id, keyword) VALUES ($1, $2)`,
+      [id, key]
+    )
+  }
+
   return result.rows[0]
 }
 

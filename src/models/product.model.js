@@ -189,7 +189,7 @@ const getProductById = async id => {
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.id = $1 AND p.active = true
+    WHERE p.slug = $1 AND p.active = true
     `,
     [id]
   )
@@ -200,35 +200,26 @@ const getProductById = async id => {
   // 2. Lấy ảnh sản phẩm
   const imageRes = await db.query(
     `SELECT image_url FROM product_images WHERE product_id = $1`,
-    [id]
+    [product.id]
   )
   product.images = imageRes.rows.map(r => r.image_url)
 
   // 3. Lấy danh sách thông số kỹ thuật (figures)
   const figureRes = await db.query(
     `SELECT id, key, value FROM product_figures WHERE product_id = $1`,
-    [id]
+    [product.id]
   )
   product.productFigure = figureRes.rows
 
-  const characteristicProduct = await db.query(
-    `SELECT cp.*, ch.name as characteristic_name 
-         FROM characteristic_product cp 
-         LEFT JOIN characteristic ch ON cp.characteristic_id = ch.id 
-         WHERE cp.product_id = $1`,
-    [id]
-  )
-
-  product.characteristicProduct = characteristicProduct.rows
   // 4. Lấy các sản phẩm cùng danh mục (trừ chính nó)
   const sameCategoryRes = await db.query(
     `
-    SELECT * FROM products
+    SELECT name, price, image, slug FROM products
     WHERE category_id = $1 AND id != $2 AND active = true
     ORDER BY created_at DESC
     LIMIT 6
     `,
-    [product.category_id, id]
+    [product.category_id, product.id]
   )
   product.sameCategoryProducts = sameCategoryRes.rows
 
@@ -240,8 +231,14 @@ const getProductById = async id => {
     ORDER BY created_at DESC
     LIMIT 6
     `,
-    [product.brand_id, id]
+    [product.brand_id, product.id]
   )
+
+  const productKeyword = await db.query(
+    `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1`,
+    [product.id]
+  )
+  product.keyword = productKeyword.rows
   product.sameBrandProducts = sameBrandRes.rows
 
   return product
@@ -275,16 +272,12 @@ const getProductByIdPrivate = async id => {
     `SELECT id, key, value FROM product_figures WHERE product_id = $1`,
     [id]
   )
-  product.productFigure = figureRes.rows
-
-  const characteristicProduct = await db.query(
-    `SELECT cp.*, ch.name as characteristic_name 
-         FROM characteristic_product cp 
-         LEFT JOIN characteristic ch ON cp.characteristic_id = ch.id 
-         WHERE cp.product_id = $1`,
+  const productKeyword = await db.query(
+    `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1`,
     [id]
   )
-  product.characteristicProduct = characteristicProduct.rows
+  product.keyword = productKeyword.rows
+  product.productFigure = figureRes.rows
 
   return product
 }
@@ -305,7 +298,9 @@ const createProduct = async (
     category_id,
     brand_id,
     active,
-    index
+    index,
+    slug,
+    keyword
   } = data
 
   const existingIndex = await db.query(
@@ -321,8 +316,8 @@ const createProduct = async (
   const result = await db.query(
     `INSERT INTO products (
       name, description, short_description,
-      price, price_sale, category_id, brand_id, active, index, image
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      price, price_sale, category_id, brand_id, active, index, slug, image
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
     RETURNING id`,
     [
       name,
@@ -334,6 +329,7 @@ const createProduct = async (
       brand_id,
       active,
       index,
+      slug,
       image
     ]
   )
@@ -362,6 +358,14 @@ const createProduct = async (
     )
   }
 
+  const keywordList = JSON.parse(keyword || '[]')
+  for (const key of keywordList) {
+    await db.query(
+      `INSERT INTO product_keyword (product_id,keyword) VALUES ($1, $2)`,
+      [productId, key]
+    )
+  }
+
   return { id: productId }
 }
 
@@ -383,7 +387,9 @@ const updateProduct = async (
     category_id,
     brand_id,
     active,
-    index
+    index,
+    slug,
+    keyword
   } = data
   // Kiểm tra product tồn tại
   const checkExist = await db.query('SELECT id FROM products WHERE id = $1', [
@@ -416,7 +422,8 @@ const updateProduct = async (
       category_id=$6, 
       brand_id=$7,
       active=$8,
-      index=$9`
+      index=$9
+      slug=$10`
   const params = [
     name,
     description,
@@ -426,16 +433,17 @@ const updateProduct = async (
     category_id,
     brand_id,
     active,
-    index
+    index,
+    slug
   ]
 
   if (image) {
-    updateQuery += `, image=$10`
+    updateQuery += `, image=$11`
     params.push(image)
-    updateQuery += ` WHERE id=$11 RETURNING *`
+    updateQuery += ` WHERE id=$12 RETURNING *`
     params.push(id)
   } else {
-    updateQuery += ` WHERE id=$10 RETURNING *`
+    updateQuery += ` WHERE id=$11 RETURNING *`
     params.push(id)
   }
 
@@ -479,6 +487,15 @@ const updateProduct = async (
     await db.query(
       `INSERT INTO characteristic_product (product_id, characteristic_id) VALUES ($1, $2)`,
       [id, type]
+    )
+  }
+
+  const keywordList = JSON.parse(keyword || '[]')
+  await db.query(`DELETE FROM product_keyword WHERE product_id = $1`, [id])
+  for (const key of keywordList) {
+    await db.query(
+      `INSERT INTO product_keyword (product_id, keyword) VALUES ($1, $2)`,
+      [id, key]
     )
   }
 

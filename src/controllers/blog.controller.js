@@ -37,7 +37,8 @@ const getAllPrivate = async (req, res) => {
     })
     res.json(result)
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error })
+    console.error(err)
+    next(err)
   }
 }
 
@@ -60,7 +61,7 @@ const getByIdPrivate = async (req, res) => {
   res.json(item)
 }
 
-const create = async (req, res) => {
+const create = async (req, res, next) => {
   try {
     const profile = await userModel.findUserById(req.user.id)
     const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
@@ -75,9 +76,12 @@ const create = async (req, res) => {
       short_description,
       blog_category_id,
       active,
-      is_draft
+      is_draft,
+      slug,
+      keyword
     } = req.body
     const image = req.file ? `/uploads/${req.file.filename}` : null
+    const keywordList = JSON.parse(keyword || '[]')
 
     const blog = await blogModel.createBLog({
       title,
@@ -87,15 +91,18 @@ const create = async (req, res) => {
       active,
       image,
       is_draft,
-      user_id: req.user.id
+      user_id: req.user.id,
+      slug,
+      keyword: keywordList
     })
     res.status(201).json(blog)
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi tạo blog', error: err.message })
+    console.error(err)
+    next(err)
   }
 }
 
-const update = async (req, res) => {
+const update = async (req, res, next) => {
   try {
     const profile = await userModel.findUserById(req.user.id)
     const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
@@ -111,8 +118,11 @@ const update = async (req, res) => {
       short_description,
       blog_category_id,
       active,
-      is_draft
+      is_draft,
+      slug,
+      keyword
     } = req.body
+    const keywordList = JSON.parse(keyword || '[]')
     const image = req.file
       ? `/uploads/${req.file.filename}`
       : req.body.image || null
@@ -123,17 +133,18 @@ const update = async (req, res) => {
       blog_category_id,
       active,
       is_draft,
+      slug,
+      keyword: keywordList,
       image
     })
     res.status(201).json(blog)
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: 'Lỗi cập nhật tin tức', error: err.message })
+    console.error(err)
+    next(err)
   }
 }
 
-const remove = async (req, res) => {
+const remove = async (req, res, next) => {
   try {
     const profile = await userModel.findUserById(req.user.id)
     const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
@@ -145,7 +156,8 @@ const remove = async (req, res) => {
     await blogModel.deleteBLog(req.params.id)
     res.json({ message: 'Đã xoá tin tức' })
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi xóa tin tức', error: err.message })
+    console.error(err)
+    next(err)
   }
 }
 
