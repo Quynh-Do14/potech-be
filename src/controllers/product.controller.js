@@ -126,7 +126,7 @@ const create = async (req, res, next) => {
   }
 }
 
-const update = async (req, res) => {
+const update = async (req, res, next) => {
   try {
     const profile = await userModel.findUserById(req.user.id)
     const allowedRoles = [ROLES.ADMIN, ROLES.SELLER]
