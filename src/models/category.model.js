@@ -89,7 +89,7 @@ const createCategory = async ({ name, image, description, index, slug }) => {
 
     if (slug) {
       const existingCategory = await db.query(
-        'SELECT * FROM categories WHERE LOWER(slug) = LLOWER($1)',
+        'SELECT * FROM categories WHERE LOWER(slug) = LOWER($1)',
         [String(slug).trim()]
       )
       if (existingCategory.rows.length > 0) {
