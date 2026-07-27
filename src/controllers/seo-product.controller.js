@@ -94,7 +94,7 @@ const create = async (req, res, next) => {
     }
 
     // Validate input
-    const { slug, title, category_id, content } = req.body
+    const { slug, title, category_id, content, description, keyword } = req.body
 
     // Validate slug
     if (!slug || slug.trim() === '') {
@@ -132,7 +132,9 @@ const create = async (req, res, next) => {
       slug.trim(),
       title.trim(),
       category_id || null,
-      content || null
+      content || null,
+      description || null,
+      keyword || []
     )
 
     res.status(201).json({
@@ -156,7 +158,7 @@ const update = async (req, res, next) => {
     }
 
     const { id } = req.params
-    const { slug, title, category_id, content } = req.body
+    const { slug, title, category_id, content, description, keyword } = req.body
 
     // Validate input
     if (!id || isNaN(parseInt(id))) {
@@ -194,7 +196,9 @@ const update = async (req, res, next) => {
       slug ? slug.trim() : undefined,
       title ? title.trim() : undefined,
       category_id !== undefined ? category_id : undefined,
-      content !== undefined ? content : undefined
+      content !== undefined ? content : undefined,
+      description !== undefined ? description : undefined,
+      keyword !== undefined || [] ? keyword : undefined || []
     )
 
     if (!product) {

@@ -73,7 +73,22 @@ const getProductById = async id => {
     const result = await db.query('SELECT * FROM seo_product WHERE id = $1', [
       id
     ])
-    return result.rows[0]
+
+    const productResult = result.rows[0]
+
+    // Kiểm tra nếu không tìm thấy sản phẩm
+    if (!productResult) {
+      return null
+    }
+
+    // Lấy keywords nếu có sản phẩm
+    const productKeyword = await db.query(
+      `SELECT id, seo_product_id, keyword FROM seo_product_keyword WHERE seo_product_id = $1`,
+      [productResult.id]
+    )
+    productResult.keyword = productKeyword.rows
+
+    return productResult
   } catch (error) {
     console.error('Lỗi khi lấy chi tiết Bài viết:', error)
     throw new AppError('Lỗi server khi lấy thông tin Bài viết', 500)
@@ -85,31 +100,49 @@ const getProductByIdPrivate = async id => {
     const result = await db.query('SELECT * FROM seo_product WHERE id = $1', [
       id
     ])
-    const product = result.rows[0]
 
-    if (product) {
-      // Lấy blog liên quan nếu có (nếu bạn muốn)
-      const blog = await db.query(
-        'SELECT * FROM blog WHERE blog_category_id = $1',
-        [id]
-      )
-      product.blog = blog.rows
+    const productResult = result.rows[0]
+
+    // Kiểm tra nếu không tìm thấy sản phẩm
+    if (!productResult) {
+      return null
     }
 
-    return product
+    // Lấy keywords
+    const productKeyword = await db.query(
+      `SELECT id, seo_product_id, keyword FROM seo_product_keyword WHERE seo_product_id = $1`,
+      [productResult.id]
+    )
+    productResult.keyword = productKeyword.rows
+
+    return productResult
   } catch (error) {
     console.error('Lỗi khi lấy chi tiết Bài viết:', error)
     throw new AppError('Lỗi server khi lấy thông tin Bài viết', 500)
   }
 }
-
 const getProductBySlug = async slug => {
   try {
     const result = await db.query(
       'SELECT * FROM seo_product WHERE LOWER(slug) = LOWER($1)',
       [slug]
     )
-    return result.rows[0]
+
+    const productResult = result.rows[0]
+
+    // Nếu không tìm thấy sản phẩm, trả về null
+    if (!productResult) {
+      return null
+    }
+
+    // Lấy keywords nếu có sản phẩm
+    const productKeyword = await db.query(
+      `SELECT id, seo_product_id, keyword FROM seo_product_keyword WHERE seo_product_id = $1`,
+      [productResult.id]
+    )
+    productResult.keyword = productKeyword.rows
+
+    return productResult
   } catch (error) {
     console.error('Lỗi khi kiểm tra slug:', error)
     throw error
@@ -120,7 +153,9 @@ const createProduct = async (
   slug,
   title,
   category_id = null,
-  content = null
+  content = null,
+  description = null,
+  keyword = []
 ) => {
   try {
     // Kiểm tra slug đã tồn tại chưa
@@ -130,10 +165,19 @@ const createProduct = async (
     }
 
     const result = await db.query(
-      `INSERT INTO seo_product(slug, title, category_id, content) 
-       VALUES($1, $2, $3, $4) RETURNING *`,
-      [slug.trim(), title.trim(), category_id, content]
+      `INSERT INTO seo_product(slug, title, category_id, content, description) 
+       VALUES($1, $2, $3, $4, $5) RETURNING *`,
+      [slug.trim(), title.trim(), category_id, content, description]
     )
+    const seoProductId = result.rows[0].id
+    const keywordList = JSON.parse(keyword || '[]')
+    for (const key of keywordList) {
+      await db.query(
+        `INSERT INTO seo_product_keyword (seo_product_id,keyword) VALUES ($1, $2)`,
+        [seoProductId, key]
+      )
+    }
+
     return result.rows[0]
   } catch (error) {
     if (error instanceof AppError) {
@@ -155,7 +199,9 @@ const updateProduct = async (
   slug,
   title,
   category_id = null,
-  content = null
+  content = null,
+  description = null,
+  keyword = []
 ) => {
   try {
     // Kiểm tra sản phẩm có tồn tại không
@@ -220,6 +266,24 @@ const updateProduct = async (
       hasUpdates = true
     }
 
+    if (description !== undefined) {
+      updates.push(`description = $${paramCount++}`)
+      values.push(description)
+      hasUpdates = true
+    }
+
+    const keywordList = JSON.parse(keyword || '[]')
+    await db.query(
+      `DELETE FROM seo_product_keyword WHERE seo_product_id = $1`,
+      [id]
+    )
+    for (const key of keywordList) {
+      await db.query(
+        `INSERT INTO seo_product_keyword (seo_product_id, keyword) VALUES ($1, $2)`,
+        [id, key]
+      )
+    }
+
     // Nếu không có field nào được cập nhật
     if (!hasUpdates) {
       throw new AppError('Không có dữ liệu để cập nhật', 400)
@@ -245,7 +309,8 @@ const updateProduct = async (
       throw error
     }
 
-    if (error.code === '23505') { // Unique constraint violation
+    if (error.code === '23505') {
+      // Unique constraint violation
       throw new AppError('Đường dẫn này đã có bài viết', 400)
     }
 
@@ -269,7 +334,7 @@ const deleteProduct = async id => {
       WHERE blog_category_id = $1
     `
     const checkResult = await db.query(checkQuery, [id])
-    
+
     // const blogCount = parseInt(checkResult.rows[0].blog_count)
     // if (blogCount > 0) {
     //   throw new AppError(
