@@ -243,7 +243,7 @@ const getProductById = async id => {
     [product.brand_id, product.id]
   )
   const productKeyword = await db.query(
-    `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1`,
+    `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1 ORDER BY id DESC`,
     [product.id]
   )
   product.keyword = productKeyword.rows
@@ -292,7 +292,7 @@ const getProductByIdPrivate = async id => {
   product.characteristicProduct = characteristicProduct.rows
 
   const productKeyword = await db.query(
-    `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1`,
+    `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1 ORDER BY id DESC`,
     [id]
   )
   product.keyword = productKeyword.rows

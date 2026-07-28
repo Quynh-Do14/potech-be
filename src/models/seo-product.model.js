@@ -83,7 +83,7 @@ const getProductById = async id => {
 
     // Lấy keywords nếu có sản phẩm
     const productKeyword = await db.query(
-      `SELECT id, seo_product_id, keyword FROM seo_product_keyword WHERE seo_product_id = $1`,
+      `SELECT id, seo_product_id, keyword FROM seo_product_keyword WHERE seo_product_id = $1 ORDER BY id DESC`,
       [productResult.id]
     )
     productResult.keyword = productKeyword.rows
@@ -110,7 +110,7 @@ const getProductByIdPrivate = async id => {
 
     // Lấy keywords
     const productKeyword = await db.query(
-      `SELECT id, seo_product_id, keyword FROM seo_product_keyword WHERE seo_product_id = $1`,
+      `SELECT id, seo_product_id, keyword FROM seo_product_keyword WHERE seo_product_id = $1 ORDER BY id DESC`,
       [productResult.id]
     )
     productResult.keyword = productKeyword.rows
@@ -137,7 +137,7 @@ const getProductBySlug = async slug => {
 
     // Lấy keywords nếu có sản phẩm
     const productKeyword = await db.query(
-      `SELECT id, seo_product_id, keyword FROM seo_product_keyword WHERE seo_product_id = $1`,
+      `SELECT id, seo_product_id, keyword FROM seo_product_keyword WHERE seo_product_id = $1 ORDER BY id DESC`,
       [productResult.id]
     )
     productResult.keyword = productKeyword.rows
