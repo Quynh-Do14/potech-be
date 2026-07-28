@@ -199,14 +199,14 @@ const getProductById = async id => {
 
   // 2. Lấy ảnh sản phẩm
   const imageRes = await db.query(
-    `SELECT image_url FROM product_images WHERE product_id = $1`,
+    `SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY id DESC`,
     [product.id]
   )
   product.images = imageRes.rows.map(r => r.image_url)
 
   // 3. Lấy danh sách thông số kỹ thuật (figures)
   const figureRes = await db.query(
-    `SELECT id, key, value FROM product_figures WHERE product_id = $1`,
+    `SELECT id, key, value FROM product_figures WHERE product_id = $1 ORDER BY id DESC`,
     [product.id]
   )
   product.productFigure = figureRes.rows
@@ -215,7 +215,7 @@ const getProductById = async id => {
     `SELECT cp.*, ch.name as characteristic_name 
          FROM characteristic_product cp 
          LEFT JOIN characteristic ch ON cp.characteristic_id = ch.id 
-         WHERE cp.product_id = $1`,
+         WHERE cp.product_id = $1 ORDER BY id DESC`,
     [product.id]
   )
 
