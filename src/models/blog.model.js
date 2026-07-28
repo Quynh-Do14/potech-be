@@ -172,7 +172,7 @@ const getBLogById = async id => {
   )
 
   const blogKeyword = await db.query(
-    `SELECT id, blog_id, keyword FROM blog_keyword WHERE blog_id = $1 ORDER BY id DESC`,
+    `SELECT id, blog_id, keyword FROM blog_keyword WHERE blog_id = $1 ORDER BY id ASC`,
     [blog.id]
   )
   const keyword = blogKeyword.rows
@@ -198,7 +198,7 @@ const getBLogByIdPrivate = async id => {
   )
 
   const blogKeyword = await db.query(
-    `SELECT id, blog_id, keyword FROM blog_keyword WHERE blog_id = $1 ORDER BY id DESC`,
+    `SELECT id, blog_id, keyword FROM blog_keyword WHERE blog_id = $1 ORDER BY id ASC`,
     [id]
   )
 
