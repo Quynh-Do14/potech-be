@@ -199,14 +199,14 @@ const getProductById = async id => {
 
   // 2. Lấy ảnh sản phẩm
   const imageRes = await db.query(
-    `SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY id DESC`,
+    `SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY id ASC`,
     [product.id]
   )
   product.images = imageRes.rows.map(r => r.image_url)
 
   // 3. Lấy danh sách thông số kỹ thuật (figures)
   const figureRes = await db.query(
-    `SELECT id, key, value FROM product_figures WHERE product_id = $1 ORDER BY id DESC`,
+    `SELECT id, key, value FROM product_figures WHERE product_id = $1 ORDER BY id ASC`,
     [product.id]
   )
   product.productFigure = figureRes.rows
@@ -215,7 +215,7 @@ const getProductById = async id => {
     `SELECT cp.*, ch.name as characteristic_name 
          FROM characteristic_product cp 
          LEFT JOIN characteristic ch ON cp.characteristic_id = ch.id 
-         WHERE cp.product_id = $1 ORDER BY id DESC`,
+         WHERE cp.product_id = $1 ORDER BY id ASC`,
     [product.id]
   )
 
@@ -243,7 +243,7 @@ const getProductById = async id => {
     [product.brand_id, product.id]
   )
   const productKeyword = await db.query(
-    `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1 ORDER BY id DESC`,
+    `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1 ORDER BY id ASC`,
     [product.id]
   )
   product.keyword = productKeyword.rows
@@ -270,14 +270,14 @@ const getProductByIdPrivate = async id => {
 
   // 2. Lấy ảnh sản phẩm
   const imageRes = await db.query(
-    `SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY id DESC`,
+    `SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY id ASC`,
     [id]
   )
   product.images = imageRes.rows.map(r => r.image_url)
 
   // 3. Lấy danh sách thông số kỹ thuật (figures)
   const figureRes = await db.query(
-    `SELECT id, key, value FROM product_figures WHERE product_id = $1 ORDER BY id DESC`,
+    `SELECT id, key, value FROM product_figures WHERE product_id = $1 ORDER BY id ASC`,
     [id]
   )
   product.productFigure = figureRes.rows
@@ -286,13 +286,13 @@ const getProductByIdPrivate = async id => {
     `SELECT cp.*, ch.name as characteristic_name 
          FROM characteristic_product cp 
          LEFT JOIN characteristic ch ON cp.characteristic_id = ch.id 
-         WHERE cp.product_id = $1 ORDER BY id DESC`,
+         WHERE cp.product_id = $1 ORDER BY id ASC`,
     [id]
   )
   product.characteristicProduct = characteristicProduct.rows
 
   const productKeyword = await db.query(
-    `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1 ORDER BY id DESC`,
+    `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1 ORDER BY id ASC`,
     [id]
   )
   product.keyword = productKeyword.rows
