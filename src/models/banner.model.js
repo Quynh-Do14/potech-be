@@ -144,7 +144,7 @@ const getBannerByIdPrivate = async id => {
   return result.rows[0]
 }
 
-const createBanner = async ({ name, image, type, active }) => {
+const createBanner = async ({ name, image, type, active, url }) => {
   // Danh sách type hợp lệ
   const validTypes = ['HOMEPAGE', 'INTRODUCE', 'AGENCY', 'CONTACT', 'POLICY']
 
@@ -195,13 +195,13 @@ const createBanner = async ({ name, image, type, active }) => {
   }
 
   const result = await db.query(
-    'INSERT INTO banner(name, image, type, active) VALUES($1, $2, $3, $4) RETURNING *',
-    [name, image, type, active]
+    'INSERT INTO banner(name, image, type, active, url) VALUES($1, $2, $3, $4, $5) RETURNING *',
+    [name, image, type, active, url]
   )
   return result.rows[0]
 }
 
-const updateBanner = async (id, { name, image, type, active }) => {
+const updateBanner = async (id, { name, image, type, active, url }) => {
   // Danh sách type hợp lệ
   const validTypes = ['HOMEPAGE', 'INTRODUCE', 'AGENCY', 'CONTACT', 'POLICY']
 
@@ -312,6 +312,11 @@ const updateBanner = async (id, { name, image, type, active }) => {
   if (active !== undefined) {
     fields.push('active')
     values.push(active.trim())
+  }
+
+  if (url !== undefined) {
+    fields.push('url')
+    values.push(url.trim())
   }
 
   // CHỈ cập nhật ảnh nếu image không phải là undefined VÀ không phải là null/chuỗi rỗng

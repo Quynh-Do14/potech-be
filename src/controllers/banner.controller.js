@@ -60,13 +60,14 @@ const create = async (req, res) => {
     return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
   }
   try {
-    const { name, type, active } = req.body
+    const { name, type, active, url } = req.body
     const image = req.file ? `/uploads/${req.file.filename}` : null
 
     const newCategory = await bannerModel.createBanner({
       name,
       type,
       active,
+      url,
       image
     })
     res.status(201).json(newCategory)
@@ -83,7 +84,7 @@ const update = async (req, res) => {
     return res.status(403).json({ message: MESSAGES.UNAUTHORIZED })
   }
   try {
-    const { name, type, active } = req.body
+    const { name, type, active, url } = req.body
     const image = req.file
       ? `/uploads/${req.file.filename}`
       : req.body.image || null
@@ -92,6 +93,7 @@ const update = async (req, res) => {
       name,
       type,
       active,
+      url,
       image
     })
     if (!updated) return res.status(404).json({ message: 'Not found' })
