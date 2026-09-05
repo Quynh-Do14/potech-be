@@ -15,20 +15,22 @@ const getAllProducts = async ({
 
   // Data query với đầy đủ conditions
   let query = `
-    SELECT p.*, c.name AS category_name, b.name AS brand_name
+    SELECT DISTINCT p.*, c.name AS category_name
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN brands b ON p.brand_id = b.id
+    LEFT JOIN brand_product bp ON p.id = bp.product_id
+    LEFT JOIN brands b ON bp.brand_id = b.id
   `
 
   let countQuery = `
-    SELECT COUNT(*)
+    SELECT COUNT(DISTINCT p.id)
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN brands b ON p.brand_id = b.id
+    LEFT JOIN brand_product bp ON p.id = bp.product_id
+    LEFT JOIN brands b ON bp.brand_id = b.id
   `
 
-  const conditions = ['p.active = true'] // Thêm active vào đây
+  const conditions = ['p.active = true']
 
   if (search) {
     queryParams.push(`%${search}%`)
@@ -42,7 +44,7 @@ const getAllProducts = async ({
 
   if (brand_id) {
     queryParams.push(brand_id)
-    conditions.push(`p.brand_id = $${queryParams.length}`)
+    conditions.push(`bp.brand_id = $${queryParams.length}`)
   }
 
   if (min_price) {
@@ -55,7 +57,7 @@ const getAllProducts = async ({
     conditions.push(`p.price <= $${queryParams.length}`)
   }
 
-  // FIXED: Đúng syntax WHERE clause
+  // WHERE clause
   if (conditions.length > 0) {
     const whereClause = ` WHERE ${conditions.join(' AND ')}`
     query += whereClause
@@ -109,10 +111,11 @@ const getAllProductsPrivate = async ({
   const offset = (page - 1) * limit
   const queryParams = []
   let query = `
-    SELECT p.*, c.name AS category_name, b.name AS brand_name
+    SELECT DISTINCT p.*, c.name AS category_name
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN brands b ON p.brand_id = b.id
+    LEFT JOIN brand_product bp ON p.id = bp.product_id
+    LEFT JOIN brands b ON bp.brand_id = b.id
   `
   let countQuery = `SELECT COUNT(*) FROM products p`
   const conditions = []
@@ -220,6 +223,17 @@ const getProductById = async id => {
   )
 
   product.characteristicProduct = characteristicProduct.rows
+
+  const brandProduct = await db.query(
+    `SELECT cp.*, ch.name as brand_name 
+         FROM brand_product cp 
+         LEFT JOIN brands ch ON cp.brand_id = ch.id 
+         WHERE cp.product_id = $1 ORDER BY id ASC`,
+    [product.id]
+  )
+
+  product.brandProduct = brandProduct.rows
+
   // 4. Lấy các sản phẩm cùng danh mục (trừ chính nó)
   const sameCategoryRes = await db.query(
     `
@@ -291,6 +305,16 @@ const getProductByIdPrivate = async id => {
   )
   product.characteristicProduct = characteristicProduct.rows
 
+  const brandProduct = await db.query(
+    `SELECT cp.*, ch.name as brand_name 
+         FROM brand_product cp 
+         LEFT JOIN brands ch ON cp.brand_id = ch.id 
+         WHERE cp.product_id = $1 ORDER BY id ASC`,
+    [product.id]
+  )
+
+  product.brandProduct = brandProduct.rows
+
   const productKeyword = await db.query(
     `SELECT id, product_id, keyword FROM product_keyword WHERE product_id = $1 ORDER BY id ASC`,
     [id]
@@ -305,6 +329,7 @@ const createProduct = async (
   imageUrls = [],
   productFigure = [],
   characteristic_product = [],
+  brand_product = [],
   image = null
 ) => {
   const {
@@ -376,6 +401,13 @@ const createProduct = async (
     )
   }
 
+  for (const brand of brand_product) {
+    await db.query(
+      `INSERT INTO brand_product (product_id, brand_id) VALUES ($1, $2)`,
+      [productId, brand]
+    )
+  }
+
   const keywordList = JSON.parse(keyword || '[]')
   for (const key of keywordList) {
     await db.query(
@@ -394,6 +426,7 @@ const updateProduct = async (
   remainingImages = [],
   productFigure = [],
   characteristic_product = [],
+  brand_product = [],
   image = null // ảnh chính (thumbnail)
 ) => {
   const {
@@ -505,6 +538,14 @@ const updateProduct = async (
     await db.query(
       `INSERT INTO characteristic_product (product_id, characteristic_id) VALUES ($1, $2)`,
       [id, type]
+    )
+  }
+
+  await db.query(`DELETE FROM brand_product WHERE product_id = $1`, [id])
+  for (const brand of brand_product) {
+    await db.query(
+      `INSERT INTO brand_product (product_id, brand_id) VALUES ($1, $2)`,
+      [id, brand]
     )
   }
 

@@ -20,11 +20,8 @@ const getById = async (req, res) => {
 const create = async (req, res) => {
   try {
     const { name } = req.body
-    const image = req.file ? `/uploads/${req.file.filename}` : null
-
     const newBrand = await brandModel.createBrand({
-      name,
-      image
+      name
     })
     res.status(201).json(newBrand)
   } catch (err) {
@@ -35,13 +32,9 @@ const create = async (req, res) => {
 const update = async (req, res) => {
   try {
     const { name } = req.body
-    const image = req.file
-      ? `/uploads/${req.file.filename}`
-      : req.body.image || null
 
     const updated = await brandModel.updateBrand(req.params.id, {
-      name,
-      image
+      name
     })
     if (!updated) return res.status(404).json({ message: 'Not found' })
     res.json(updated)

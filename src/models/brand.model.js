@@ -49,27 +49,18 @@ const getBrandById = async id => {
   return result.rows[0]
 }
 
-const createBrand = async ({ name, image }) => {
+const createBrand = async ({ name }) => {
   const result = await db.query(
-    'INSERT INTO brands(name, image) VALUES($1, $2) RETURNING *',
-    [name, image]
+    'INSERT INTO brands(name) VALUES($1) RETURNING *',
+    [name]
   )
   return result.rows[0]
 }
 
-const updateBrand = async (id, { name, image }) => {
+const updateBrand = async (id, { name }) => {
   const fields = ['name']
   const values = [name]
   let query = 'UPDATE brands SET name = $1'
-
-  if (image !== undefined && image !== null && image !== '') {
-    fields.push('image')
-    values.push(image)
-    query = 'UPDATE brands SET name = $1, image = $2'
-  }
-
-  query += ` WHERE id = $${fields.length + 1} RETURNING *`
-  values.push(id)
 
   const result = await db.query(query, values)
   return result.rows[0]
