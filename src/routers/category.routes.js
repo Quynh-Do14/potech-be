@@ -6,8 +6,10 @@ const { authenticate } = require('../middlewares/auth.middleware')
 
 // CRUD danh mục sản phẩm
 router.get('/', categoryController.getAll)
+router.get('/private', categoryController.getAllPrivate)
 router.get('/private/:id', authenticate, categoryController.getByIdPrivate)
 router.get('/:id', categoryController.getById)
+router.get('/private-slug/:slug', categoryController.getBySlug)
 router.post(
   '/',
   authenticate,

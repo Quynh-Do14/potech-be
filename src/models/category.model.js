@@ -4,6 +4,54 @@ const AppError = require('../utils/AppError')
 const getAllCategories = async ({ page = 1, limit = 10, search = '' }) => {
   const offset = (page - 1) * limit
   const queryParams = []
+  let query = 'SELECT * FROM categories where is_edit = true'
+  let countQuery = 'SELECT COUNT(*) FROM categories where is_edit = true'
+  let conditions = []
+
+  // Tìm kiếm theo tên (search)
+  if (search) {
+    queryParams.push(`%${search}%`)
+    conditions.push(`LOWER(name) LIKE LOWER($${queryParams.length})`)
+  }
+
+  // Gắn điều kiện nếu có
+  if (conditions.length > 0) {
+    const whereClause = ` WHERE ${conditions.join(' AND ')}`
+    query += whereClause
+    countQuery += whereClause
+  }
+
+  // Thêm phân trang
+  queryParams.push(limit)
+  queryParams.push(offset)
+  query += ` ORDER BY index ASC LIMIT $${queryParams.length - 1} OFFSET $${
+    queryParams.length
+  }`
+
+  // Truy vấn dữ liệu và tổng số dòng
+  const dataResult = await db.query(query, queryParams)
+  const countResult = await db.query(
+    countQuery,
+    queryParams.slice(0, queryParams.length - 2)
+  )
+  const total = parseInt(countResult.rows[0].count)
+
+  return {
+    data: dataResult.rows,
+    total,
+    page: parseInt(page),
+    limit: parseInt(limit),
+    totalPages: Math.ceil(total / limit)
+  }
+}
+
+const getAllCategoriesPrivate = async ({
+  page = 1,
+  limit = 10,
+  search = ''
+}) => {
+  const offset = (page - 1) * limit
+  const queryParams = []
   let query = 'SELECT * FROM categories'
   let countQuery = 'SELECT COUNT(*) FROM categories'
   let conditions = []
@@ -46,24 +94,100 @@ const getAllCategories = async ({ page = 1, limit = 10, search = '' }) => {
 }
 
 const getCategoryById = async id => {
-  const result = await db.query('SELECT * FROM categories WHERE slug = $1', [
-    id
-  ])
-  return result.rows[0]
+  try {
+    const result = await db.query('SELECT * FROM categories WHERE id = $1', [
+      id
+    ])
+    const productResult = result.rows[0]
+
+    // Kiểm tra nếu không tìm thấy sản phẩm
+    if (!productResult) {
+      return null
+    }
+
+    // Lấy keywords nếu có sản phẩm
+    const productKeyword = await db.query(
+      `SELECT id, seo_category_id, keyword FROM category_keywords WHERE seo_category_id = $1 ORDER BY id ASC`,
+      [productResult.id]
+    )
+    productResult.keyword = productKeyword.rows
+
+    return productResult
+  } catch (error) {
+    console.error('Lỗi khi lấy chi tiết Bài viết:', error)
+    throw new AppError('Lỗi server khi lấy thông tin Bài viết', 500)
+  }
+}
+
+const getCategoryBySlug = async slug => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM categories WHERE LOWER(slug) = LOWER($1)',
+      [slug]
+    )
+
+    const productResult = result.rows[0]
+
+    // Nếu không tìm thấy sản phẩm, trả về null
+    if (!productResult) {
+      return null
+    }
+
+    // Lấy keywords nếu có sản phẩm
+    const productKeyword = await db.query(
+      `SELECT id, seo_category_id, keyword FROM category_keywords WHERE seo_category_id = $1 ORDER BY id ASC`,
+      [productResult.id]
+    )
+    productResult.keyword = productKeyword.rows
+
+    return productResult
+  } catch (error) {
+    console.error('Lỗi khi kiểm tra slug:', error)
+    throw error
+  }
 }
 
 const getCategoryByIdPrivate = async id => {
-  const result = await db.query('SELECT * FROM categories WHERE id = $1', [id])
-  const category = result.rows[0]
-  const products = await db.query(
-    'SELECT * FROM products WHERE category_id = $1',
-    [id]
-  )
-  category.products = products.rows
-  return category
+  try {
+    const result = await db.query('SELECT * FROM categories WHERE id = $1', [
+      id
+    ])
+    const products = await db.query(
+      'SELECT * FROM products WHERE category_id = $1',
+      [id]
+    )
+    const productResult = result.rows[0]
+
+    // Kiểm tra nếu không tìm thấy sản phẩm
+    if (!productResult) {
+      return null
+    }
+
+    // Lấy keywords
+    const productKeyword = await db.query(
+      `SELECT id, seo_category_id, keyword FROM category_keywords WHERE seo_category_id = $1 ORDER BY id ASC`,
+      [productResult.id]
+    )
+    productResult.keyword = productKeyword.rows
+
+    productResult.products = products.rows
+    return productResult
+  } catch (error) {
+    console.error('Lỗi khi lấy chi tiết Bài viết:', error)
+    throw new AppError('Lỗi server khi lấy thông tin Bài viết', 500)
+  }
 }
 
-const createCategory = async ({ name, image, description, index, slug }) => {
+const createCategory = async ({
+  name,
+  image,
+  description,
+  index,
+  slug,
+  title = '',
+  content = '',
+  keyword = []
+}) => {
   try {
     // Kiểm tra index đã tồn tại chưa (nếu có index)
     if (index !== undefined && index !== null) {
@@ -98,9 +222,19 @@ const createCategory = async ({ name, image, description, index, slug }) => {
     }
 
     const result = await db.query(
-      'INSERT INTO categories(name, image, description, index, slug) VALUES($1, $2, $3, $4, $5) RETURNING *',
-      [name, image, description, index || null, slug] // Cho phép index null
+      'INSERT INTO categories(name, image, description, index, slug, title, content) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [name, image, description, index || null, slug, title, content] // Cho phép index null
     )
+
+    const seoProductId = result.rows[0].id
+    const keywordList = JSON.parse(keyword || '[]')
+    for (const key of keywordList) {
+      await db.query(
+        `INSERT INTO category_keywords (seo_category_id, keyword) VALUES ($1, $2)`,
+        [seoProductId, key]
+      )
+    }
+
     return result.rows[0]
   } catch (error) {
     if (error.code === '23505') {
@@ -111,7 +245,17 @@ const createCategory = async ({ name, image, description, index, slug }) => {
   }
 }
 
-const updateCategory = async (id, name, description, index, image, slug) => {
+const updateCategory = async (
+  id,
+  name,
+  description,
+  index,
+  image,
+  slug,
+  title,
+  content = null,
+  keyword = []
+) => {
   try {
     // Kiểm tra danh mục có tồn tại không
     const categoryExists = await db.query(
@@ -185,10 +329,33 @@ const updateCategory = async (id, name, description, index, image, slug) => {
       paramIndex++
     }
 
+    if (title !== undefined) {
+      updateFields.push(`title = $${paramIndex}`)
+      params.push(title)
+      paramIndex++
+    }
+
+    if (content !== undefined) {
+      updateFields.push(`content = $${paramIndex}`)
+      params.push(content)
+      paramIndex++
+    }
+
     if (image !== undefined) {
       updateFields.push(`image = $${paramIndex}`)
       params.push(image)
       paramIndex++
+    }
+
+    const keywordList = JSON.parse(keyword || '[]')
+    await db.query(`DELETE FROM category_keywords WHERE seo_category_id = $1`, [
+      id
+    ])
+    for (const key of keywordList) {
+      await db.query(
+        `INSERT INTO category_keywords (seo_category_id, keyword) VALUES ($1, $2)`,
+        [id, key]
+      )
     }
 
     // Thêm id vào params
@@ -373,7 +540,9 @@ const deleteCategory = async id => {
 
 module.exports = {
   getAllCategories,
+  getAllCategoriesPrivate,
   getCategoryById,
+  getCategoryBySlug,
   getCategoryByIdPrivate,
   createCategory,
   updateCategory,

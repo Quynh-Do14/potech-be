@@ -14,10 +14,46 @@ const getAll = async (req, res) => {
   }
 }
 
+const getAllPrivate = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = '' } = req.query
+
+    const result = await categoryModel.getAllCategoriesPrivate({
+      page,
+      limit,
+      search
+    })
+    res.json(result)
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error })
+  }
+}
+
 const getById = async (req, res) => {
   const data = await categoryModel.getCategoryById(req.params.id)
   if (!data) return res.status(404).json({ message: 'Not found' })
   res.json(data)
+}
+
+const getBySlug = async (req, res, next) => {
+  try {
+    const { slug } = req.params
+
+    if (!slug || slug.trim() === '') {
+      throw new AppError('Slug không hợp lệ', 400)
+    }
+
+    const product = await categoryModel.getCategoryBySlug(slug)
+
+    // Nếu không tìm thấy, trả về object rỗng
+    if (!product) {
+      return res.json({})
+    }
+
+    res.json(product)
+  } catch (error) {
+    next(error)
+  }
 }
 
 const getByIdPrivate = async (req, res) => {
@@ -43,7 +79,7 @@ const create = async (req, res, next) => {
     throw new AppError('Không có quyền thực hiện hành động này', 403)
   }
   try {
-    const { name, description, index, slug } = req.body
+    const { name, description, index, slug, title, content, keyword } = req.body
 
     // Validate dữ liệu đầu vào
     if (!name || name.trim() === '') {
@@ -58,10 +94,13 @@ const create = async (req, res, next) => {
 
     const newCategory = await categoryModel.createCategory({
       name: name.trim(),
-      description: description ? description.trim() : null,
+      description: description,
       index,
       image,
-      slug
+      slug,
+      title,
+      content,
+      keyword
     })
 
     res.status(201).json({
@@ -85,7 +124,8 @@ const update = async (req, res, next) => {
     }
 
     const { id } = req.params
-    const { name, description, image, index, slug } = req.body
+    const { name, image, index, slug, title, description, content, keyword } =
+      req.body
 
     if (!name || name.trim() === '') {
       throw new AppError('Tên danh mục blog là bắt buộc', 400)
@@ -98,10 +138,13 @@ const update = async (req, res, next) => {
     const category = await categoryModel.updateCategory(
       id,
       name.trim(),
-      description,
+      description || null,
       index,
       image,
-      slug
+      slug,
+      title,
+      content || null,
+      keyword || []
     )
 
     if (!category) {
@@ -219,8 +262,10 @@ const remove = async (req, res, next) => {
 
 module.exports = {
   getAll,
+  getAllPrivate,
   getById,
   getByIdPrivate,
+  getBySlug,
   create,
   update,
   updateIndexes,

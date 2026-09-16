@@ -225,10 +225,10 @@ const getProductById = async id => {
   product.characteristicProduct = characteristicProduct.rows
 
   const brandProduct = await db.query(
-    `SELECT cp.*, ch.name as brand_name 
-         FROM brand_product cp 
-         LEFT JOIN brands ch ON cp.brand_id = ch.id 
-         WHERE cp.product_id = $1 ORDER BY id ASC`,
+    `SELECT bp.*, ch.name as brand_name 
+         FROM brand_product bp 
+         LEFT JOIN brands ch ON bp.brand_id = ch.id 
+         WHERE bp.product_id = $1 ORDER BY id ASC`,
     [product.id]
   )
 
@@ -306,10 +306,10 @@ const getProductByIdPrivate = async id => {
   product.characteristicProduct = characteristicProduct.rows
 
   const brandProduct = await db.query(
-    `SELECT cp.*, ch.name as brand_name 
-         FROM brand_product cp 
-         LEFT JOIN brands ch ON cp.brand_id = ch.id 
-         WHERE cp.product_id = $1 ORDER BY id ASC`,
+    `SELECT bp.*, ch.name as brand_name 
+         FROM brand_product bp 
+         LEFT JOIN brands ch ON bp.brand_id = ch.id 
+         WHERE bp.product_id = $1 ORDER BY id ASC`,
     [product.id]
   )
 

@@ -11,7 +11,11 @@ const getAllProducts = async ({
   try {
     const offset = (page - 1) * limit
     const queryParams = []
-    let query = 'SELECT * FROM seo_product'
+    let query = `
+    SELECT DISTINCT sp.*, c.name AS category_name, c.slug AS category_slug
+    FROM seo_product sp
+    LEFT JOIN categories c ON sp.category_id = c.id
+    `
     let countQuery = 'SELECT COUNT(*) FROM seo_product'
     let conditions = []
 
@@ -70,9 +74,14 @@ const getAllProducts = async ({
 
 const getProductById = async id => {
   try {
-    const result = await db.query('SELECT * FROM seo_product WHERE id = $1', [
-      id
-    ])
+    const result = await db.query(
+      `
+      SELECT DISTINCT sp.*, c.name AS category_name, c.slug AS category_slug
+      FROM seo_product sp
+      LEFT JOIN categories c ON sp.category_id = c.id
+      WHERE sp.id = $1`,
+      [id]
+    )
 
     const productResult = result.rows[0]
 
@@ -97,9 +106,14 @@ const getProductById = async id => {
 
 const getProductByIdPrivate = async id => {
   try {
-    const result = await db.query('SELECT * FROM seo_product WHERE id = $1', [
-      id
-    ])
+    const result = await db.query(
+      `
+      SELECT DISTINCT sp.*, c.name AS category_name, c.slug AS category_slug
+      FROM seo_product sp
+      LEFT JOIN categories c ON sp.category_id = c.id
+      WHERE sp.id = $1`,
+      [id]
+    )
 
     const productResult = result.rows[0]
 
@@ -124,7 +138,10 @@ const getProductByIdPrivate = async id => {
 const getProductBySlug = async slug => {
   try {
     const result = await db.query(
-      'SELECT * FROM seo_product WHERE LOWER(slug) = LOWER($1)',
+      `SELECT DISTINCT sp.*, c.name AS category_name, c.slug AS category_slug
+      FROM seo_product sp
+      LEFT JOIN categories c ON sp.category_id = c.id
+      WHERE LOWER(category_slug) = LOWER($1)`,
       [slug]
     )
 
