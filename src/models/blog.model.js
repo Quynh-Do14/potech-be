@@ -70,6 +70,30 @@ const getAllBLog = async ({
   }
 }
 
+const getAllBlogLink = async () => {
+  const query = `
+    SELECT b.id, b.title, b.slug
+    FROM blog b
+    WHERE b.active = true
+    ORDER BY b.id DESC
+  `
+
+  const countQuery = `
+    SELECT COUNT(*) AS count
+    FROM blog b
+    WHERE b.active = true
+  `
+
+  const [dataResult, countResult] = await Promise.all([
+    db.query(query),
+    db.query(countQuery)
+  ])
+
+  return {
+    data: dataResult.rows,
+    total: parseInt(countResult.rows[0].count, 10)
+  }
+}
 const getAllBLogPrivate = async ({
   page = 1,
   limit = 10,
@@ -344,6 +368,7 @@ const deleteBLog = async id => {
 
 module.exports = {
   getAllBLog,
+  getAllBlogLink,
   getAllBLogPrivate,
   getBLogById,
   getBLogByIdPrivate,

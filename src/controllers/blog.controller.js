@@ -17,7 +17,14 @@ const getAll = async (req, res) => {
     res.status(500).json({ message: 'Server error', error })
   }
 }
-
+const getAllLink = async (req, res) => {
+  try {
+    const result = await blogModel.getAllBlogLink()
+    res.json(result)
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error })
+  }
+}
 const getAllPrivate = async (req, res) => {
   const profile = await userModel.findUserById(req.user.id)
   const allowedRoles = [ROLES.ADMIN, ROLES.WRITTER]
@@ -163,6 +170,7 @@ const remove = async (req, res, next) => {
 
 module.exports = {
   getAll,
+  getAllLink,
   getAllPrivate,
   getById,
   getByIdPrivate,

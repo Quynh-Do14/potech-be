@@ -5,6 +5,7 @@ const upload = require('../middlewares/upload.middleware')
 const { authenticate } = require('../middlewares/auth.middleware')
 
 router.get('/', blogController.getAll)
+router.get('/link', blogController.getAllLink)
 router.get('/private', authenticate, blogController.getAllPrivate)
 router.get('/private/:id', authenticate, blogController.getByIdPrivate)
 router.get('/:id', blogController.getById)
