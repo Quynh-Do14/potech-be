@@ -441,124 +441,184 @@ const updateProduct = async (
     index,
     slug,
     keyword
-  } = data
-  // Kiểm tra product tồn tại
+  } = data || {}
+
+  // ---------------------------------------------------------
+  // 1. Kiểm tra sản phẩm tồn tại
+  // ---------------------------------------------------------
   const checkExist = await db.query('SELECT id FROM products WHERE id = $1', [
     id
   ])
-
   if (checkExist.rows.length === 0) {
     throw new AppError('Không tìm thấy sản phẩm', 404)
   }
 
-  // Kiểm tra index đã tồn tại chưa (nếu có)
+  // ---------------------------------------------------------
+  // 2. Kiểm tra index trùng (nếu có)
+  // ---------------------------------------------------------
   if (index !== undefined && index !== null) {
     const existingOrder = await db.query(
       'SELECT id FROM products WHERE index = $1 AND id != $2',
       [index, id]
     )
-
     if (existingOrder.rows.length > 0) {
-      throw new AppError(`Số thứ tự ${index} đã tồn tại`, 400) // ✅ Giữ nguyên
+      throw new AppError(`Số thứ tự ${index} đã tồn tại`, 400)
     }
   }
 
-  let updateQuery = `
-    UPDATE products SET 
-      name=$1, 
-      description=$2, 
-      short_description=$3, 
-      price=$4, 
-      price_sale=$5,
-      category_id=$6, 
-      brand_id=$7,
-      active=$8,
-      index=$9,
-      slug=$10`
-  const params = [
-    name,
-    description,
-    short_description,
-    price,
-    price_sale,
-    category_id,
-    brand_id,
-    active,
-    index,
-    slug
-  ]
+  // ---------------------------------------------------------
+  // 3. Chuẩn hoá price_sale: null/undefined/'' -> 0
+  // ---------------------------------------------------------
+  const normalizedPriceSale =
+    price_sale === null || price_sale === undefined || price_sale === ''
+      ? 0
+      : Number(price_sale)
+  const safePriceSale = Number.isNaN(normalizedPriceSale)
+    ? 0
+    : normalizedPriceSale
 
-  if (image) {
-    updateQuery += `, image=$11`
-    params.push(image)
-    updateQuery += ` WHERE id=$12 RETURNING *`
-    params.push(id)
-  } else {
-    updateQuery += ` WHERE id=$11 RETURNING *`
-    params.push(id)
+  // ---------------------------------------------------------
+  // 4. Build câu UPDATE động (chỉ set field !== undefined)
+  // ---------------------------------------------------------
+  const fields = []
+  const params = []
+  let paramIndex = 1
+
+  const pushField = (column, value) => {
+    fields.push(`${column} = $${paramIndex}`)
+    params.push(value)
+    paramIndex++
   }
 
-  const result = await db.query(updateQuery, params)
+  if (name !== undefined) pushField('name', name)
+  if (description !== undefined) pushField('description', description)
+  if (short_description !== undefined)
+    pushField('short_description', short_description)
+  if (price !== undefined) pushField('price', price)
+  if (price_sale !== undefined) pushField('price_sale', safePriceSale)
+  if (category_id !== undefined) pushField('category_id', category_id)
+  if (brand_id !== undefined) pushField('brand_id', brand_id)
+  if (active !== undefined) pushField('active', active)
+  if (index !== undefined) pushField('index', index)
+  if (slug !== undefined) pushField('slug', slug)
+  if (image) pushField('image', image)
 
-  // Cập nhật ảnh phụ
-  const oldImagesRes = await db.query(
-    `SELECT image_url FROM product_images WHERE product_id = $1`,
-    [id]
-  )
-  const oldImages = oldImagesRes.rows.map(row => row.image_url)
+  if (fields.length === 0) {
+    throw new AppError('Không có trường nào để cập nhật', 400)
+  }
 
-  const imagesToDelete = oldImages.filter(url => !remainingImages.includes(url))
-  for (const url of imagesToDelete) {
-    await db.query(
-      `DELETE FROM product_images WHERE product_id = $1 AND image_url = $2`,
-      [id, url]
+  params.push(id)
+  const updateQuery = `
+    UPDATE products
+    SET ${fields.join(', ')}
+    WHERE id = $${paramIndex}
+    RETURNING *
+  `
+
+  // ---------------------------------------------------------
+  // 5. Parse keyword an toàn (array hoặc JSON string)
+  // ---------------------------------------------------------
+  let keywordList = []
+  if (Array.isArray(keyword)) {
+    keywordList = keyword
+  } else if (typeof keyword === 'string' && keyword.trim() !== '') {
+    try {
+      const parsed = JSON.parse(keyword)
+      if (Array.isArray(parsed)) keywordList = parsed
+    } catch {
+      keywordList = []
+    }
+  }
+
+  // ---------------------------------------------------------
+  // 6. Transaction
+  // ---------------------------------------------------------
+  const client = await db.connect()
+  try {
+    await client.query('BEGIN')
+
+    // 6.1 Cập nhật bảng products
+    const result = await client.query(updateQuery, params)
+
+    // 6.2 Ảnh phụ
+    //     - Nếu remainingImages được truyền dạng mảng -> xoá những ảnh cũ không còn
+    //     - Nếu remainingImages là undefined/null -> giữ nguyên ảnh cũ
+    if (Array.isArray(remainingImages)) {
+      const oldImagesRes = await client.query(
+        `SELECT image_url FROM product_images WHERE product_id = $1`,
+        [id]
+      )
+      const oldImages = oldImagesRes.rows.map(r => r.image_url)
+      const imagesToDelete = oldImages.filter(
+        url => !remainingImages.includes(url)
+      )
+      for (const url of imagesToDelete) {
+        await client.query(
+          `DELETE FROM product_images WHERE product_id = $1 AND image_url = $2`,
+          [id, url]
+        )
+      }
+    }
+    for (const url of newImageUrls) {
+      await client.query(
+        `INSERT INTO product_images (product_id, image_url) VALUES ($1, $2)`,
+        [id, url]
+      )
+    }
+
+    // 6.3 Thông số kỹ thuật
+    await client.query(`DELETE FROM product_figures WHERE product_id = $1`, [
+      id
+    ])
+    for (const figure of productFigure) {
+      await client.query(
+        `INSERT INTO product_figures (product_id, key, value) VALUES ($1, $2, $3)`,
+        [id, figure.key, figure.value]
+      )
+    }
+
+    // 6.4 Đặc tính
+    await client.query(
+      `DELETE FROM characteristic_product WHERE product_id = $1`,
+      [id]
     )
-  }
+    for (const type of characteristic_product) {
+      await client.query(
+        `INSERT INTO characteristic_product (product_id, characteristic_id) VALUES ($1, $2)`,
+        [id, type]
+      )
+    }
 
-  for (const url of newImageUrls) {
-    await db.query(
-      `INSERT INTO product_images (product_id, image_url) VALUES ($1, $2)`,
-      [id, url]
-    )
-  }
+    // 6.5 Thương hiệu liên kết
+    await client.query(`DELETE FROM brand_product WHERE product_id = $1`, [id])
+    for (const brand of brand_product) {
+      await client.query(
+        `INSERT INTO brand_product (product_id, brand_id) VALUES ($1, $2)`,
+        [id, brand]
+      )
+    }
 
-  // Cập nhật thông số kỹ thuật
-  await db.query(`DELETE FROM product_figures WHERE product_id = $1`, [id])
-  for (const figure of productFigure) {
-    await db.query(
-      `INSERT INTO product_figures (product_id, key, value) VALUES ($1, $2, $3)`,
-      [id, figure.key, figure.value]
-    )
-  }
+    // 6.6 Từ khoá
+    await client.query(`DELETE FROM product_keyword WHERE product_id = $1`, [
+      id
+    ])
+    for (const key of keywordList) {
+      await client.query(
+        `INSERT INTO product_keyword (product_id, keyword) VALUES ($1, $2)`,
+        [id, key]
+      )
+    }
 
-  await db.query(`DELETE FROM characteristic_product WHERE product_id = $1`, [
-    id
-  ])
-  for (const type of characteristic_product) {
-    await db.query(
-      `INSERT INTO characteristic_product (product_id, characteristic_id) VALUES ($1, $2)`,
-      [id, type]
-    )
+    await client.query('COMMIT')
+    return result.rows[0]
+  } catch (error) {
+    await client.query('ROLLBACK')
+    if (error instanceof AppError) throw error
+    console.error('Lỗi khi cập nhật sản phẩm:', error)
+    throw new AppError('Lỗi server khi cập nhật sản phẩm', 500)
+  } finally {
+    client.release()
   }
-
-  await db.query(`DELETE FROM brand_product WHERE product_id = $1`, [id])
-  for (const brand of brand_product) {
-    await db.query(
-      `INSERT INTO brand_product (product_id, brand_id) VALUES ($1, $2)`,
-      [id, brand]
-    )
-  }
-
-  const keywordList = JSON.parse(keyword || '[]')
-  await db.query(`DELETE FROM product_keyword WHERE product_id = $1`, [id])
-  for (const key of keywordList) {
-    await db.query(
-      `INSERT INTO product_keyword (product_id, keyword) VALUES ($1, $2)`,
-      [id, key]
-    )
-  }
-
-  return result.rows[0]
 }
 
 const updateProductIndex = async items => {
